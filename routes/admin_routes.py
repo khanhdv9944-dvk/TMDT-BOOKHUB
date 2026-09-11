@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func, desc
 from database import get_db
 import models, schemas, auth
+import notification_service
 
 router = APIRouter(prefix="/api/admin", tags=["Admin Portal"])
 
@@ -275,6 +276,14 @@ def approve_book(
     book.rejected_at = None
     book.rejected_by = None
     db.commit()
+    db.refresh(book)
+
+    # Luồng 2 (Admin -> NXB): Gửi thông báo tới NXB
+    try:
+        notification_service.notify_seller_book_approved(db=db, book=book)
+    except Exception as e:
+        print(f"[NOTIFICATION ERROR] Không thể gửi thông báo phê duyệt tới NXB: {e}")
+
     return {"message": f"Đã duyệt cho phép cuốn '{book.title}' mở bán trên trang chủ!"}
 
 @router.post("/books/{book_id}/reject")
@@ -294,6 +303,15 @@ def reject_book(
     book.rejected_at = datetime.utcnow()
     book.rejected_by = current_user.id
     db.commit()
+    db.refresh(book)
+
+    # Luồng 2 (Admin -> NXB): Gửi thông báo từ chối tới NXB
+    rejection_reason_str = reason.reason if reason else None
+    try:
+        notification_service.notify_seller_book_rejected(db=db, book=book, reason=rejection_reason_str)
+    except Exception as e:
+        print(f"[NOTIFICATION ERROR] Không thể gửi thông báo từ chối tới NXB: {e}")
+
     return {"message": f"Đã từ chối cuốn '{book.title}'"}
 
 

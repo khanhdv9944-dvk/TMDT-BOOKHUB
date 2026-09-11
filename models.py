@@ -32,6 +32,11 @@ class PaymentStatus(str, enum.Enum):
     FAILED = "FAILED"
     CANCELLED = "CANCELLED"
 
+class NotificationType(str, enum.Enum):
+    NEW_BOOK_SUBMITTED = "NEW_BOOK_SUBMITTED"
+    BOOK_APPROVED = "BOOK_APPROVED"
+    BOOK_REJECTED = "BOOK_REJECTED"
+
 class User(Base):
     __tablename__ = "users"
 
@@ -364,3 +369,19 @@ class SellerStaff(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
     seller = relationship("User")
+
+
+class Notification(Base):
+    __tablename__ = "notifications"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    title = Column(String(255), nullable=False)
+    message = Column(Text, nullable=False)
+    type = Column(String(50), nullable=False) # 'NEW_BOOK_SUBMITTED', 'BOOK_APPROVED', 'BOOK_REJECTED'
+    reference_id = Column(Integer, nullable=True) # ID của cuốn sách liên quan
+    is_read = Column(Boolean, default=False, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    user = relationship("User", backref="notifications")
+

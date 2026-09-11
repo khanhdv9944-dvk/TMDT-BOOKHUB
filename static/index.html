@@ -411,8 +411,32 @@
 
     <section class="section-block">
       <div class="section-title-wrap flash-sale-heading">
-        <h2 class="section-title"><span>⚡ FLASH SALE</span><small>Giá sốc trong ngày</small></h2>
-        <div class="countdown-box"><span><b>02</b><small>Ngày</small></span><i>:</i><span><b>08</b><small>Giờ</small></span><i>:</i><span><b>32</b><small>Phút</small></span><i>:</i><span><b>18</b><small>Giây</small></span></div>
+        <div class="flash-sale-left">
+          <span class="flash-sale-icon">⚡</span>
+          <span class="flash-sale-title">FLASH SALE</span>
+          <span class="flash-sale-subtitle">Giá sốc trong ngày</span>
+        </div>
+        <div class="countdown-box" id="flash-sale-countdown">
+          <div class="countdown-unit">
+            <span class="countdown-num" id="fs-days">02</span>
+            <span class="countdown-label">Ngày</span>
+          </div>
+          <span class="countdown-sep">:</span>
+          <div class="countdown-unit">
+            <span class="countdown-num" id="fs-hours">08</span>
+            <span class="countdown-label">Giờ</span>
+          </div>
+          <span class="countdown-sep">:</span>
+          <div class="countdown-unit">
+            <span class="countdown-num" id="fs-minutes">32</span>
+            <span class="countdown-label">Phút</span>
+          </div>
+          <span class="countdown-sep">:</span>
+          <div class="countdown-unit">
+            <span class="countdown-num" id="fs-seconds">18</span>
+            <span class="countdown-label">Giây</span>
+          </div>
+        </div>
       </div>
       <div id="flash-sale-grid" class="flash-sale-grid"></div>
     </section>
@@ -495,6 +519,22 @@
         </div>
         
         <div class="seller-header-actions">
+          <!-- Notification Bell (Seller) -->
+          <div class="notif-bell-wrap" id="seller-notif-wrap">
+            <button class="notif-bell-btn" id="seller-notif-btn" onclick="toggleNotifDropdown('seller')" aria-label="Thông báo" title="Thông báo">
+              🔔
+              <span class="notif-badge" id="seller-notif-badge" style="display:none;">0</span>
+            </button>
+            <div class="notif-dropdown" id="seller-notif-dropdown" style="display:none;">
+              <div class="notif-dropdown-header">
+                <span>🔔 Thông báo</span>
+                <button class="notif-mark-all" onclick="markAllRead('seller')">Đánh dấu đã đọc</button>
+              </div>
+              <div class="notif-list" id="seller-notif-list">
+                <div class="notif-empty">Đang tải...</div>
+              </div>
+            </div>
+          </div>
           <div class="seller-balance-pill">
             <div class="balance-sub">Số dư ví khả dụng (90%):</div>
             <div id="seller-header-balance" class="balance-amount">0 đ</div>
@@ -1051,7 +1091,22 @@
       <div class="admin-brand"><span class="admin-brand-mark">B</span><strong>BookHub</strong><span class="admin-brand-label">OPERATIONS</span></div>
       <div class="admin-breadcrumb"><span>Admin</span><b>/</b><strong id="admin-breadcrumb-label">Tổng quan</strong></div>
       <label class="admin-global-search"><span>⌕</span><input id="admin-global-search" type="search" placeholder="Tìm đơn, sách, seller, email..." oninput="handleAdminGlobalSearch(this.value)"></label>
-      <button class="admin-icon-button" onclick="showToast('Đang hiển thị các hàng đợi cần xử lý.', 'info')" aria-label="Thông báo">♢<i id="admin-notification-count">0</i></button>
+      <!-- Notification Bell (Admin) -->
+      <div class="notif-bell-wrap admin-notif-wrap" id="admin-notif-wrap">
+        <button class="notif-bell-btn admin-notif-bell" id="admin-notif-btn" onclick="toggleNotifDropdown('admin')" aria-label="Thông báo" title="Thông báo">
+          🔔
+          <span class="notif-badge" id="admin-notif-badge" style="display:none;">0</span>
+        </button>
+        <div class="notif-dropdown notif-dropdown-admin" id="admin-notif-dropdown" style="display:none;">
+          <div class="notif-dropdown-header">
+            <span>🔔 Thông báo Admin</span>
+            <button class="notif-mark-all" onclick="markAllRead('admin')">Đánh dấu đã đọc</button>
+          </div>
+          <div class="notif-list" id="admin-notif-list">
+            <div class="notif-empty">Đang tải...</div>
+          </div>
+        </div>
+      </div>
       <button class="admin-account" onclick="toggleAdminAccountMenu()"><span class="admin-avatar">A</span><span><b id="admin-account-name">Admin</b><small>Super Admin</small></span><span>⌄</span></button>
       <div id="admin-account-menu" class="admin-account-menu"><button onclick="handleLogout()">Đăng xuất</button></div>
     </header>

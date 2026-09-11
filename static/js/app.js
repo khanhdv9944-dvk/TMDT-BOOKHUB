@@ -92,6 +92,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   renderMiniCart();
   initDarkMode();
   renderHeroSlide();
+  initFlashSaleCountdown();
   window.addEventListener('popstate', handleBookHistoryNavigation);
   document.addEventListener('click', event => {
     const target = event.target;
@@ -3434,6 +3435,7 @@ function showPublicMarketplace() {
   resetPageScroll();
   renderUserProfileWidget();
   loadCategories();
+  initFlashSaleCountdown();
   switchPortal('BUYER');
 }
 
@@ -3876,3 +3878,344 @@ async function submitSingleProductOrder() {
     localStorage.removeItem('bookhub_checkout_single'); localStorage.removeItem('bookhub_pending_buy_now'); root.style.display = 'none'; showOrderSuccess(order);
   } catch (error) { button.disabled = false; button.textContent = 'Đặt hàng'; }
 }
+
+// =============================================================================
+// HỆ THỐNG THÔNG BÁO HAI CHIỀU (NXB ↔ Admin)
+// =============================================================================
+
+/** State thông báo - lưu trạng thái hiện tại */
+const notifState = {
+  notifications: [],
+  unreadCount: 0,
+  pollingInterval: null,
+  dropdownOpen: null // 'seller' | 'admin' | null
+};
+
+/**
+ * Lấy danh sách thông báo từ API và cập nhật UI.
+ * Gọi mỗi khi portal được mở hoặc theo polling interval.
+ */
+async function fetchAndUpdateNotifications() {
+  if (!state.token || !state.currentUser) return;
+  try {
+    const [notifications, countData] = await Promise.all([
+      fetch('/api/notifications?limit=20', {
+        headers: { 'Authorization': `Bearer ${state.token}` }
+      }).then(r => r.ok ? r.json() : []),
+      fetch('/api/notifications/unread-count', {
+        headers: { 'Authorization': `Bearer ${state.token}` }
+      }).then(r => r.ok ? r.json() : { unread_count: 0 })
+    ]);
+
+    notifState.notifications = notifications;
+    notifState.unreadCount = countData.unread_count || 0;
+
+    updateNotifBadge();
+
+    // Nếu dropdown đang mở, cập nhật nội dung luôn
+    if (notifState.dropdownOpen) {
+      renderNotifList(notifState.dropdownOpen);
+    }
+  } catch (e) {
+    // Silently fail - notifications are non-critical
+  }
+}
+
+/** Cập nhật badge đếm số chưa đọc trên Bell Icon */
+function updateNotifBadge() {
+  const count = notifState.unreadCount;
+  const role = state.currentUser?.role;
+
+  // Seller Bell Badge
+  const sellerBadge = document.getElementById('seller-notif-badge');
+  if (sellerBadge) {
+    if (role === 'SELLER' && count > 0) {
+      sellerBadge.textContent = count > 99 ? '99+' : count;
+      sellerBadge.style.display = 'flex';
+    } else {
+      sellerBadge.style.display = 'none';
+    }
+  }
+
+  // Admin Bell Badge
+  const adminBadge = document.getElementById('admin-notif-badge');
+  if (adminBadge) {
+    if (role === 'ADMIN' && count > 0) {
+      adminBadge.textContent = count > 99 ? '99+' : count;
+      adminBadge.style.display = 'flex';
+    } else {
+      adminBadge.style.display = 'none';
+    }
+  }
+}
+
+/** Render danh sách thông báo trong dropdown */
+function renderNotifList(portal) {
+  const listEl = document.getElementById(`${portal}-notif-list`);
+  if (!listEl) return;
+
+  if (!notifState.notifications.length) {
+    listEl.innerHTML = '<div class="notif-empty">Bạn chưa có thông báo nào 🎉</div>';
+    return;
+  }
+
+  listEl.innerHTML = notifState.notifications.map(n => {
+    const typeIcon = {
+      'NEW_BOOK_SUBMITTED': '📚',
+      'BOOK_APPROVED': '✅',
+      'BOOK_REJECTED': '❌'
+    }[n.type] || '🔔';
+
+    const timeAgo = formatTimeAgo(n.created_at);
+    const unreadClass = n.is_read ? '' : 'notif-item-unread';
+
+    return `
+      <div class="notif-item ${unreadClass}" 
+           onclick="handleNotifClick(${n.id}, ${n.reference_id || 'null'}, '${portal}')"
+           role="button" tabindex="0">
+        <div class="notif-item-icon">${typeIcon}</div>
+        <div class="notif-item-body">
+          <div class="notif-item-title">${escapeHtml(n.title)}</div>
+          <div class="notif-item-message">${escapeHtml(n.message)}</div>
+          <div class="notif-item-time">${timeAgo}</div>
+        </div>
+        ${!n.is_read ? '<span class="notif-item-dot"></span>' : ''}
+      </div>
+    `;
+  }).join('');
+}
+
+/** Toggle dropdown mở/đóng */
+function toggleNotifDropdown(portal) {
+  const dropdown = document.getElementById(`${portal}-notif-dropdown`);
+  if (!dropdown) return;
+
+  const isOpen = dropdown.style.display !== 'none';
+
+  // Đóng tất cả dropdown khác trước
+  closeAllNotifDropdowns();
+
+  if (isOpen) {
+    notifState.dropdownOpen = null;
+  } else {
+    dropdown.style.display = 'block';
+    notifState.dropdownOpen = portal;
+
+    // Animate vào
+    dropdown.style.opacity = '0';
+    dropdown.style.transform = 'translateY(-8px)';
+    requestAnimationFrame(() => {
+      dropdown.style.transition = 'opacity 0.2s ease, transform 0.2s ease';
+      dropdown.style.opacity = '1';
+      dropdown.style.transform = 'translateY(0)';
+    });
+
+    // Render notifications
+    renderNotifList(portal);
+
+    // Fetch fresh data
+    fetchAndUpdateNotifications();
+  }
+}
+
+/** Đóng tất cả notification dropdown */
+function closeAllNotifDropdowns() {
+  ['seller', 'admin'].forEach(p => {
+    const dd = document.getElementById(`${p}-notif-dropdown`);
+    if (dd) dd.style.display = 'none';
+  });
+  notifState.dropdownOpen = null;
+}
+
+/**
+ * Xử lý click vào một thông báo:
+ * 1. Đánh dấu đã đọc (gọi API)
+ * 2. Chuyển hướng tới sách nếu có reference_id
+ */
+async function handleNotifClick(notifId, bookId, portal) {
+  // Đánh dấu đã đọc ngay trên UI (optimistic update)
+  const notif = notifState.notifications.find(n => n.id === notifId);
+  if (notif && !notif.is_read) {
+    notif.is_read = true;
+    notifState.unreadCount = Math.max(0, notifState.unreadCount - 1);
+    updateNotifBadge();
+    renderNotifList(portal);
+
+    // Gọi API trong background
+    try {
+      await fetch(`/api/notifications/${notifId}/read`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${state.token}` }
+      });
+    } catch (e) {}
+  }
+
+  // Đóng dropdown
+  closeAllNotifDropdowns();
+
+  // Chuyển hướng tới sách liên quan
+  if (bookId) {
+    if (state.currentUser?.role === 'ADMIN') {
+      // Admin: mở trang quản lý sản phẩm
+      switchAdminView('products');
+      showToast(`Đang tải thông tin sách #${bookId}...`, 'info');
+    } else if (state.currentUser?.role === 'SELLER') {
+      // NXB: chuyển sang tab Quản Lý Sách
+      switchSellerTab('products');
+      showToast(`Đang mở danh sách sách của bạn...`, 'info');
+    }
+  }
+}
+
+/** Đánh dấu tất cả thông báo là đã đọc */
+async function markAllRead(portal) {
+  try {
+    await fetch('/api/notifications/mark-all-read', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${state.token}` }
+    });
+
+    // Cập nhật local state
+    notifState.notifications.forEach(n => n.is_read = true);
+    notifState.unreadCount = 0;
+    updateNotifBadge();
+    renderNotifList(portal);
+    showToast('Đã đánh dấu tất cả thông báo là đã đọc', 'success');
+  } catch (e) {
+    showToast('Không thể cập nhật thông báo', 'error');
+  }
+}
+
+/** Format thời gian tương đối (vd: "5 phút trước") */
+function formatTimeAgo(isoString) {
+  if (!isoString) return '';
+  const date = new Date(isoString + (isoString.endsWith('Z') ? '' : 'Z'));
+  const now = new Date();
+  const diffMs = now - date;
+  const diffSecs = Math.floor(diffMs / 1000);
+  const diffMins = Math.floor(diffSecs / 60);
+  const diffHours = Math.floor(diffMins / 60);
+  const diffDays = Math.floor(diffHours / 24);
+
+  if (diffSecs < 60) return 'Vừa xong';
+  if (diffMins < 60) return `${diffMins} phút trước`;
+  if (diffHours < 24) return `${diffHours} giờ trước`;
+  if (diffDays < 7) return `${diffDays} ngày trước`;
+  return date.toLocaleDateString('vi-VN');
+}
+
+/** Escape HTML để tránh XSS */
+function escapeHtml(str) {
+  if (!str) return '';
+  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+/** Bắt đầu auto-polling thông báo mỗi 30 giây */
+function startNotifPolling() {
+  stopNotifPolling();
+  fetchAndUpdateNotifications(); // Lấy ngay lần đầu
+  notifState.pollingInterval = setInterval(fetchAndUpdateNotifications, 30000);
+}
+
+/** Dừng polling */
+function stopNotifPolling() {
+  if (notifState.pollingInterval) {
+    clearInterval(notifState.pollingInterval);
+    notifState.pollingInterval = null;
+  }
+}
+
+// Đóng dropdown khi click bên ngoài
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('.notif-bell-wrap')) {
+    closeAllNotifDropdowns();
+  }
+});
+
+// Hook vào switchPortal để bắt đầu/dừng polling theo portal
+const _origSwitchPortal = typeof switchPortal === 'function' ? switchPortal : null;
+if (_origSwitchPortal) {
+  window.switchPortal = function(portal) {
+    _origSwitchPortal(portal);
+    if (portal === 'SELLER' || portal === 'ADMIN') {
+      startNotifPolling();
+    } else {
+      stopNotifPolling();
+      updateNotifBadge();
+    }
+  };
+}
+
+// =============================================================================
+// FLASH SALE REAL-TIME DYNAMIC COUNTDOWN TIMER
+// =============================================================================
+let flashSaleTimerInterval = null;
+
+function initFlashSaleCountdown() {
+  const daysEl = document.getElementById('fs-days');
+  const hoursEl = document.getElementById('fs-hours');
+  const minutesEl = document.getElementById('fs-minutes');
+  const secondsEl = document.getElementById('fs-seconds');
+  const countdownBox = document.getElementById('flash-sale-countdown');
+
+  if (!daysEl || !hoursEl || !minutesEl || !secondsEl) return;
+
+  const STORAGE_KEY = 'bookhub_flash_sale_target';
+  let targetTime = parseInt(localStorage.getItem(STORAGE_KEY), 10);
+  const now = Date.now();
+
+  // Mốc thời gian kết thúc Flash Sale (Target Date).
+  // Mặc định: 2 ngày, 8 giờ, 32 phút, 18 giây
+  if (!targetTime || isNaN(targetTime) || targetTime <= now) {
+    const durationMs = (2 * 86400 + 8 * 3600 + 32 * 60 + 18) * 1000;
+    targetTime = now + durationMs;
+    localStorage.setItem(STORAGE_KEY, targetTime.toString());
+  }
+
+  function updateCountdown() {
+    const currentTime = Date.now();
+    const remainingMs = targetTime - currentTime;
+
+    if (remainingMs <= 0) {
+      // Khi hết thời gian đếm ngược (về 00:00:00:00), tự động dừng đếm ngược và xử lý trạng thái hết sale
+      if (flashSaleTimerInterval) {
+        clearInterval(flashSaleTimerInterval);
+        flashSaleTimerInterval = null;
+      }
+      daysEl.textContent = '00';
+      hoursEl.textContent = '00';
+      minutesEl.textContent = '00';
+      secondsEl.textContent = '00';
+      if (countdownBox) {
+        countdownBox.classList.add('flash-sale-ended');
+      }
+      return;
+    }
+
+    const totalSeconds = Math.floor(remainingMs / 1000);
+    const days = Math.floor(totalSeconds / 86400);
+    const hours = Math.floor((totalSeconds % 86400) / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+
+    // Định dạng số hiển thị luôn có 2 chữ số (dùng padStart(2, '0'))
+    daysEl.textContent = String(days).padStart(2, '0');
+    hoursEl.textContent = String(hours).padStart(2, '0');
+    minutesEl.textContent = String(minutes).padStart(2, '0');
+    secondsEl.textContent = String(seconds).padStart(2, '0');
+  }
+
+  // Xóa interval cũ nếu đã tồn tại
+  if (flashSaleTimerInterval) {
+    clearInterval(flashSaleTimerInterval);
+    flashSaleTimerInterval = null;
+  }
+
+  // Cập nhật ngay tức thì
+  updateCountdown();
+
+  // Sử dụng setInterval để cập nhật liên tục mỗi 1000ms (1 giây)
+  flashSaleTimerInterval = setInterval(updateCountdown, 1000);
+}
+
+window.initFlashSaleCountdown = initFlashSaleCountdown;

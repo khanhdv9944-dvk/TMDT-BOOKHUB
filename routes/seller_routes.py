@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 from database import get_db
 import models, schemas, auth
+import notification_service
 
 router = APIRouter(prefix="/api/seller", tags=["Seller Portal"])
 
@@ -196,6 +197,12 @@ def create_book(
     db.add(new_book)
     db.commit()
     db.refresh(new_book)
+
+    # Luồng 1 (NXB -> Admin): Gửi thông báo đến tất cả Admin
+    try:
+        notification_service.notify_admins_new_book(db=db, book=new_book, seller=current_user)
+    except Exception as e:
+        print(f"[NOTIFICATION ERROR] Không thể gửi thông báo tới Admin: {e}")
 
     return {
         "id": new_book.id,
