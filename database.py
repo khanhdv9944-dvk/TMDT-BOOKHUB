@@ -78,6 +78,22 @@ def migrate_schema():
     if "users" in inspector.get_table_names():
         user_columns = {column["name"] for column in inspector.get_columns("users")}
         user_additions = {
+            "business_type": "VARCHAR(50)",
+            "company_name": "VARCHAR(150)",
+            "company_email": "VARCHAR(100)",
+            "company_phone": "VARCHAR(20)",
+            "legal_representative_name": "VARCHAR(100)",
+            "legal_representative_position": "VARCHAR(100)",
+            "legal_representative_id_number": "VARCHAR(30)",
+            "office_province": "VARCHAR(100)",
+            "office_district": "VARCHAR(100)",
+            "office_ward": "VARCHAR(100)",
+            "office_street": "VARCHAR(255)",
+            "shipping_same_as_office": "BOOLEAN DEFAULT 1 NOT NULL",
+            "shipping_province": "VARCHAR(100)",
+            "shipping_district": "VARCHAR(100)",
+            "shipping_ward": "VARCHAR(100)",
+            "shipping_street": "VARCHAR(255)",
             "tax_code": "VARCHAR(50)",
             "bank_name": "VARCHAR(100)",
             "bank_account_number": "VARCHAR(50)",
@@ -91,6 +107,17 @@ def migrate_schema():
         }
         with engine.begin() as connection:
             for name, definition in user_additions.items():
+                if name not in user_columns:
+                    connection.execute(text(f"ALTER TABLE users ADD COLUMN {name} {definition}"))
+
+    if "users" in inspector.get_table_names():
+        user_columns = {column["name"] for column in inspector.get_columns("users")}
+        seller_review_columns = {
+            "approved_at": "DATETIME",
+            "approved_by": "INTEGER",
+        }
+        with engine.begin() as connection:
+            for name, definition in seller_review_columns.items():
                 if name not in user_columns:
                     connection.execute(text(f"ALTER TABLE users ADD COLUMN {name} {definition}"))
 
@@ -141,11 +168,31 @@ def migrate_schema():
                 if name not in address_columns:
                     connection.execute(text(f"ALTER TABLE addresses ADD COLUMN {name} {definition}"))
 
+    if "return_requests" in inspector.get_table_names():
+        return_request_columns = {column["name"] for column in inspector.get_columns("return_requests")}
+        return_request_additions = {
+            "refund_method": "VARCHAR(50)",
+            "admin_note": "TEXT",
+            "shipped_at": "DATETIME",
+            "received_at": "DATETIME",
+            "cancelled_at": "DATETIME",
+        }
+        with engine.begin() as connection:
+            for name, definition in return_request_additions.items():
+                if name not in return_request_columns:
+                    connection.execute(text(f"ALTER TABLE return_requests ADD COLUMN {name} {definition}"))
+
     additive_tables = {
         "transactions": "CREATE TABLE IF NOT EXISTS transactions (id INTEGER PRIMARY KEY, transaction_code VARCHAR(50) UNIQUE NOT NULL, seller_id INTEGER, order_id INTEGER, payout_id INTEGER, transaction_type VARCHAR(30) NOT NULL, gross_amount FLOAT NOT NULL DEFAULT 0, fee_amount FLOAT NOT NULL DEFAULT 0, net_amount FLOAT NOT NULL DEFAULT 0, status VARCHAR(30) NOT NULL DEFAULT 'PENDING', note TEXT, created_at DATETIME)",
         "disputes": "CREATE TABLE IF NOT EXISTS disputes (id INTEGER PRIMARY KEY, dispute_code VARCHAR(50) UNIQUE NOT NULL, order_id INTEGER NOT NULL, buyer_id INTEGER NOT NULL, seller_id INTEGER NOT NULL, reason VARCHAR(255) NOT NULL, description TEXT NOT NULL, amount FLOAT NOT NULL DEFAULT 0, status VARCHAR(30) NOT NULL DEFAULT 'OPEN', buyer_response TEXT, seller_response TEXT, admin_decision VARCHAR(40), resolution_note TEXT, created_at DATETIME, updated_at DATETIME, resolved_at DATETIME, resolved_by INTEGER)",
         "documents": "CREATE TABLE IF NOT EXISTS documents (id INTEGER PRIMARY KEY, owner_id INTEGER NOT NULL, entity_type VARCHAR(30) NOT NULL, entity_id INTEGER NOT NULL, document_type VARCHAR(40) NOT NULL, file_name VARCHAR(255) NOT NULL, mime_type VARCHAR(100) NOT NULL, storage_path VARCHAR(500) NOT NULL, uploaded_at DATETIME, status VARCHAR(30) NOT NULL DEFAULT 'UPLOADED')",
         "notifications": "CREATE TABLE IF NOT EXISTS notifications (id INTEGER PRIMARY KEY, user_id INTEGER NOT NULL, title VARCHAR(255) NOT NULL, message TEXT NOT NULL, type VARCHAR(50) NOT NULL, reference_id INTEGER, is_read BOOLEAN DEFAULT 0 NOT NULL, created_at DATETIME, FOREIGN KEY(user_id) REFERENCES users(id))",
+        "seller_review_audit": "CREATE TABLE IF NOT EXISTS seller_review_audit (id INTEGER PRIMARY KEY, seller_id INTEGER NOT NULL, admin_id INTEGER, action VARCHAR(40) NOT NULL, previous_status VARCHAR(30), new_status VARCHAR(30), reason TEXT, created_at DATETIME)",
+        "return_requests": "CREATE TABLE IF NOT EXISTS return_requests (id INTEGER PRIMARY KEY, order_id INTEGER NOT NULL, user_id INTEGER NOT NULL, status VARCHAR(30) NOT NULL DEFAULT 'PENDING', reason VARCHAR(50) NOT NULL, description TEXT, refund_method VARCHAR(50), refund_amount FLOAT NOT NULL DEFAULT 0, rejection_reason TEXT, admin_note TEXT, created_at DATETIME, updated_at DATETIME, approved_at DATETIME, shipped_at DATETIME, received_at DATETIME, refunded_at DATETIME, cancelled_at DATETIME)",
+        "return_request_items": "CREATE TABLE IF NOT EXISTS return_request_items (id INTEGER PRIMARY KEY, return_request_id INTEGER NOT NULL, order_item_id INTEGER NOT NULL, product_id INTEGER NOT NULL, quantity INTEGER NOT NULL, unit_price FLOAT NOT NULL, product_name VARCHAR(255))",
+        "reviews": "CREATE TABLE IF NOT EXISTS reviews (id INTEGER PRIMARY KEY, user_id INTEGER NOT NULL, order_id INTEGER NOT NULL, order_item_id INTEGER NOT NULL, product_id INTEGER NOT NULL, seller_id INTEGER NOT NULL, rating INTEGER NOT NULL, content TEXT NOT NULL, status VARCHAR(30) NOT NULL DEFAULT 'REVIEWED', created_at DATETIME, updated_at DATETIME)",
+        "review_images": "CREATE TABLE IF NOT EXISTS review_images (id INTEGER PRIMARY KEY, review_id INTEGER NOT NULL, image_url VARCHAR(1000) NOT NULL, created_at DATETIME)",
+        "seller_replies": "CREATE TABLE IF NOT EXISTS seller_replies (id INTEGER PRIMARY KEY, review_id INTEGER NOT NULL UNIQUE, seller_id INTEGER NOT NULL, content TEXT NOT NULL, created_at DATETIME, updated_at DATETIME)",
     }
     with engine.begin() as connection:
         existing = set(inspect(engine).get_table_names())

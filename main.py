@@ -12,6 +12,8 @@ from routes.seller_routes import router as seller_router
 from routes.admin_routes import router as admin_router
 from routes.vip_routes import router as vip_router
 from routes.notification_routes import router as notification_router
+from routes.returns_routes import router as returns_router
+from routes.reviews_routes import router as reviews_router
 from seed_data import seed_database
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -45,6 +47,8 @@ app.include_router(seller_router)
 app.include_router(admin_router)
 app.include_router(vip_router)
 app.include_router(notification_router)
+app.include_router(returns_router)
+app.include_router(reviews_router)
 
 # Mount static assets explicitly so Vercel serves the same URLs as local FastAPI.
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
@@ -63,6 +67,14 @@ def book_detail_shell(book_id: int):
 @app.get("/admin/{admin_path:path}", include_in_schema=False)
 def admin_shell(admin_path: str = ""):
     return FileResponse(str(STATIC_DIR / "index.html"))
+
+@app.get("/terms", include_in_schema=False)
+def terms_page():
+    return FileResponse(str(STATIC_DIR / "terms.html"))
+
+@app.get("/privacy", include_in_schema=False)
+def privacy_page():
+    return FileResponse(str(STATIC_DIR / "privacy.html"))
 
 if __name__ == "__main__":
     import uvicorn

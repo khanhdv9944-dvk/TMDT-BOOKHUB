@@ -1,5 +1,5 @@
 from datetime import datetime
-from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime, ForeignKey, Text, Enum
+from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime, ForeignKey, Text, Enum, UniqueConstraint
 from sqlalchemy.orm import relationship
 from database import Base
 import enum
@@ -12,6 +12,10 @@ class UserRole(str, enum.Enum):
 class UserStatus(str, enum.Enum):
     ACTIVE = "ACTIVE"
     BANNED = "BANNED"
+    DRAFT = "DRAFT"
+    PENDING = "PENDING"
+    APPROVED = "APPROVED"
+    REJECTED = "REJECTED"
     PENDING_SELLER_APPROVAL = "PENDING_SELLER_APPROVAL"
 
 class BookStatus(str, enum.Enum):
@@ -37,6 +41,30 @@ class NotificationType(str, enum.Enum):
     BOOK_APPROVED = "BOOK_APPROVED"
     BOOK_REJECTED = "BOOK_REJECTED"
 
+class ReturnRequestStatus(str, enum.Enum):
+    PENDING = "PENDING"
+    APPROVED = "APPROVED"
+    CUSTOMER_SHIPPED = "CUSTOMER_SHIPPED"
+    RECEIVED = "RECEIVED"
+    REFUND_PROCESSING = "REFUND_PROCESSING"
+    REFUNDED = "REFUNDED"
+    REJECTED = "REJECTED"
+    CANCELLED = "CANCELLED"
+
+class ReviewStatus(str, enum.Enum):
+    NOT_REVIEWED = "NOT_REVIEWED"
+    REVIEWED = "REVIEWED"
+    EDITED = "EDITED"
+    HIDDEN = "HIDDEN"
+
+class ReturnReason(str, enum.Enum):
+    PRODUCT_DEFECT = "PRODUCT_DEFECT"
+    WRONG_PRODUCT = "WRONG_PRODUCT"
+    DESCRIPTION_MISMATCH = "DESCRIPTION_MISMATCH"
+    MISSING_ITEM = "MISSING_ITEM"
+    CHANGE_OF_MIND = "CHANGE_OF_MIND"
+    OTHER = "OTHER"
+
 class User(Base):
     __tablename__ = "users"
 
@@ -50,6 +78,23 @@ class User(Base):
     avatar = Column(String(255), nullable=True)
     phone = Column(String(20), nullable=True)
     address = Column(String(255), nullable=True)
+
+    business_type = Column(String(50), nullable=True)
+    company_name = Column(String(150), nullable=True)
+    company_email = Column(String(100), nullable=True)
+    company_phone = Column(String(20), nullable=True)
+    legal_representative_name = Column(String(100), nullable=True)
+    legal_representative_position = Column(String(100), nullable=True)
+    legal_representative_id_number = Column(String(30), nullable=True)
+    office_province = Column(String(100), nullable=True)
+    office_district = Column(String(100), nullable=True)
+    office_ward = Column(String(100), nullable=True)
+    office_street = Column(String(255), nullable=True)
+    shipping_same_as_office = Column(Boolean, default=True, nullable=False)
+    shipping_province = Column(String(100), nullable=True)
+    shipping_district = Column(String(100), nullable=True)
+    shipping_ward = Column(String(100), nullable=True)
+    shipping_street = Column(String(255), nullable=True)
     
     shop_name = Column(String(150), nullable=True)
     shop_description = Column(Text, nullable=True)
@@ -65,6 +110,8 @@ class User(Base):
     rejection_reason = Column(Text, nullable=True)
     rejected_at = Column(DateTime, nullable=True)
     rejected_by = Column(Integer, nullable=True)
+    approved_at = Column(DateTime, nullable=True)
+    approved_by = Column(Integer, nullable=True)
     
     # Dành cho Độc giả VIP
     vip_expires_at = Column(DateTime, nullable=True)
@@ -74,6 +121,9 @@ class User(Base):
     books = relationship("Book", back_populates="seller", foreign_keys="Book.seller_id")
     orders = relationship("Order", back_populates="buyer", foreign_keys="Order.buyer_id")
     ads = relationship("AdCampaign", back_populates="seller")
+    return_requests = relationship("ReturnRequest", back_populates="user", foreign_keys="ReturnRequest.user_id")
+    reviews_written = relationship("Review", foreign_keys="Review.user_id", back_populates="user")
+    reviews_received = relationship("Review", foreign_keys="Review.seller_id", back_populates="seller")
 
     @property
     def is_vip(self):
@@ -139,6 +189,7 @@ class Book(Base):
     category = relationship("Category", back_populates="books")
     order_items = relationship("OrderItem", back_populates="book")
     ad_campaigns = relationship("AdCampaign", back_populates="book")
+    reviews = relationship("Review", back_populates="product", foreign_keys="Review.product_id")
 
 class Order(Base):
     __tablename__ = "orders"
@@ -186,6 +237,7 @@ class Order(Base):
     # Relationships
     buyer = relationship("User", back_populates="orders", foreign_keys=[buyer_id])
     items = relationship("OrderItem", back_populates="order", cascade="all, delete-orphan")
+    return_requests = relationship("ReturnRequest", back_populates="order", foreign_keys="ReturnRequest.order_id", cascade="all, delete-orphan")
 
 class OrderItem(Base):
     __tablename__ = "order_items"
@@ -203,6 +255,95 @@ class OrderItem(Base):
     order = relationship("Order", back_populates="items")
     book = relationship("Book", back_populates="order_items")
     seller = relationship("User", foreign_keys=[seller_id])
+    return_items = relationship("ReturnRequestItem", foreign_keys="ReturnRequestItem.order_item_id")
+    reviews = relationship("Review", back_populates="order_item", foreign_keys="Review.order_item_id")
+
+class Review(Base):
+    __tablename__ = "reviews"
+    __table_args__ = (UniqueConstraint("order_item_id", "user_id", name="uq_review_user_order_item"),)
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    order_id = Column(Integer, ForeignKey("orders.id"), nullable=False, index=True)
+    order_item_id = Column(Integer, ForeignKey("order_items.id"), nullable=False, index=True)
+    product_id = Column(Integer, ForeignKey("books.id"), nullable=False, index=True)
+    seller_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    rating = Column(Integer, nullable=False)
+    content = Column(Text, nullable=False)
+    status = Column(String(30), default=ReviewStatus.REVIEWED.value, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    user = relationship("User", foreign_keys=[user_id], back_populates="reviews_written")
+    order = relationship("Order", foreign_keys=[order_id])
+    order_item = relationship("OrderItem", foreign_keys=[order_item_id], back_populates="reviews")
+    product = relationship("Book", foreign_keys=[product_id], back_populates="reviews")
+    seller = relationship("User", foreign_keys=[seller_id], back_populates="reviews_received")
+    images = relationship("ReviewImage", back_populates="review", cascade="all, delete-orphan")
+    seller_reply = relationship("SellerReply", back_populates="review", uselist=False, cascade="all, delete-orphan")
+
+class ReviewImage(Base):
+    __tablename__ = "review_images"
+
+    id = Column(Integer, primary_key=True, index=True)
+    review_id = Column(Integer, ForeignKey("reviews.id"), nullable=False, index=True)
+    image_url = Column(String(1000), nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    review = relationship("Review", back_populates="images")
+
+class SellerReply(Base):
+    __tablename__ = "seller_replies"
+
+    id = Column(Integer, primary_key=True, index=True)
+    review_id = Column(Integer, ForeignKey("reviews.id"), nullable=False, unique=True, index=True)
+    seller_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    content = Column(Text, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    review = relationship("Review", back_populates="seller_reply")
+    seller = relationship("User", foreign_keys=[seller_id])
+
+class ReturnRequest(Base):
+    __tablename__ = "return_requests"
+
+    id = Column(Integer, primary_key=True, index=True)
+    order_id = Column(Integer, ForeignKey("orders.id"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    status = Column(String(30), default=ReturnRequestStatus.PENDING.value, nullable=False)
+    reason = Column(String(50), nullable=False)
+    description = Column(Text, nullable=True)
+    refund_method = Column(String(50), nullable=True)
+    refund_amount = Column(Float, default=0.0, nullable=False)
+    rejection_reason = Column(Text, nullable=True)
+    admin_note = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    approved_at = Column(DateTime, nullable=True)
+    shipped_at = Column(DateTime, nullable=True)
+    received_at = Column(DateTime, nullable=True)
+    refunded_at = Column(DateTime, nullable=True)
+    cancelled_at = Column(DateTime, nullable=True)
+
+    order = relationship("Order", back_populates="return_requests", foreign_keys=[order_id])
+    user = relationship("User", back_populates="return_requests", foreign_keys=[user_id])
+    items = relationship("ReturnRequestItem", back_populates="return_request", cascade="all, delete-orphan")
+
+class ReturnRequestItem(Base):
+    __tablename__ = "return_request_items"
+
+    id = Column(Integer, primary_key=True, index=True)
+    return_request_id = Column(Integer, ForeignKey("return_requests.id"), nullable=False)
+    order_item_id = Column(Integer, ForeignKey("order_items.id"), nullable=False)
+    product_id = Column(Integer, ForeignKey("books.id"), nullable=False)
+    quantity = Column(Integer, nullable=False)
+    unit_price = Column(Float, nullable=False)
+    product_name = Column(String(255), nullable=True)
+
+    return_request = relationship("ReturnRequest", back_populates="items")
+    order_item = relationship("OrderItem", foreign_keys=[order_item_id])
+    product = relationship("Book", foreign_keys=[product_id])
 
 class Address(Base):
     __tablename__ = "addresses"
@@ -355,6 +496,21 @@ class Document(Base):
     storage_path = Column(String(500), nullable=False)
     uploaded_at = Column(DateTime, default=datetime.utcnow)
     status = Column(String(30), default="UPLOADED", nullable=False)
+
+class SellerReviewAudit(Base):
+    __tablename__ = "seller_review_audit"
+
+    id = Column(Integer, primary_key=True, index=True)
+    seller_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    admin_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    action = Column(String(40), nullable=False)
+    previous_status = Column(String(30), nullable=True)
+    new_status = Column(String(30), nullable=True)
+    reason = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    seller = relationship("User", foreign_keys=[seller_id])
+    admin = relationship("User", foreign_keys=[admin_id])
 
 class SellerStaff(Base):
     __tablename__ = "seller_staff"

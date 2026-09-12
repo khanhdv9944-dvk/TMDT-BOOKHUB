@@ -8,7 +8,9 @@ let state = {
   books: [],
   activeCategory: null,
   searchQuery: '',
-  activeTab: 'home'
+  activeTab: 'home',
+  productReviews: {},
+  productReviewSummary: {}
 };
 
 let heroSlide = 0;
@@ -932,7 +934,7 @@ async function openBookDetail(bookId, pushHistory = true) {
     if (pushHistory) history.pushState({ bookId }, '', `/books/${bookId}`);
     rememberBook(book);
     renderSmartRecommendations(book);
-    renderBookDetail(book);
+    await renderBookDetail(book);
   } catch (error) {
     renderBookNotFound();
   }
@@ -954,12 +956,13 @@ function detailPrice(book) {
   return { current, original, discount };
 }
 
-function renderBookDetail(book) {
+async function renderBookDetail(book) {
   const root = document.getElementById('book-detail-root');
   if (!root) return;
   const prices = detailPrice(book);
   const related = state.books.filter(item => item.id !== book.id && (item.category_id === book.category?.id || item.author === book.author)).slice(0, 8);
-  const reviews = detailReviews;
+  const reviewSummary = state.productReviewSummary[book.id] || { total_reviews: 0, average_rating: 0, rating_distribution: { '5': 0, '4': 0, '3': 0, '2': 0, '1': 0 }, reviews: [] };
+  const reviews = reviewSummary.reviews || [];
   document.querySelectorAll('.portal-container').forEach(portal => { portal.style.display = 'none'; });
   document.getElementById('single-checkout-root').style.display = 'none';
   root.innerHTML = `
@@ -967,15 +970,16 @@ function renderBookDetail(book) {
       <div class="detail-breadcrumb"><button onclick="navigateHome()">Trang chủ</button><span>›</span><span>${book.category?.name || book.category_name || 'Sách'}</span><span>›</span><strong>${book.title}</strong></div>
       <section class="detail-product-card">
         <div class="detail-gallery"><div class="detail-main-image"><img id="detail-main-image" src="${book.cover_image || ''}" alt="${book.title}"></div><div class="detail-thumbnails"><button class="detail-thumb active" onclick="changeDetailImage(this, '${book.cover_image || ''}')"><img src="${book.cover_image || ''}" alt=""></button><button class="detail-thumb" onclick="changeDetailImage(this, '${book.cover_image || ''}')"><img src="${book.cover_image || ''}" alt=""></button></div></div>
-        <div class="detail-info"><span class="detail-format-label">${bookFormatLabel(book)}${book.vip_eligible ? ' · 👑 VIP' : ''}</span><h1>${book.title}</h1><div class="detail-rating"><span>★★★★★</span> <strong>${Number(book.rating || 0).toFixed(1)}/5</strong> <a href="#reviews">(${reviews.length} đánh giá)</a></div><div class="detail-meta-list"><div><span>Tác giả</span><strong>${book.author || 'Đang cập nhật'}</strong></div><div><span>Nhà xuất bản</span><strong>${book.publisher || 'Đang cập nhật'}</strong></div><div><span>Tình trạng</span><strong class="${book.stock > 0 ? 'stock-in' : 'stock-out'}">${book.stock > 0 ? `Còn hàng (${book.stock})` : 'Hết hàng'}</strong></div></div><div class="detail-price"><strong>${formatVND(prices.current)}</strong>${prices.discount ? `<del>${formatVND(prices.original)}</del><span>-${prices.discount}%</span>` : ''}</div><div class="detail-buy-row"><span>Số lượng</span><div class="detail-quantity"><button onclick="changeDetailQuantity(-1)">−</button><strong id="detail-quantity">1</strong><button onclick="changeDetailQuantity(1)">+</button></div></div><div class="detail-actions"><button class="btn-preview detail-cart-button" onclick="addDetailToCart(${book.id})">🛒 Thêm vào giỏ hàng</button><button class="btn-buy detail-buy-button" onclick="buyNow(${book.id}, Number(document.getElementById('detail-quantity').textContent))">⚡ Mua ngay</button></div><div class="detail-promise"><span>✓</span> Đọc thử miễn phí · Đổi trả trong 7 ngày · Giao hàng toàn quốc</div></div>
+        <div class="detail-info"><span class="detail-format-label">${bookFormatLabel(book)}${book.vip_eligible ? ' · 👑 VIP' : ''}</span><h1>${book.title}</h1><div class="detail-rating"><span>★★★★★</span> <strong>${Number(reviewSummary.average_rating || book.rating || 0).toFixed(1)}/5</strong> <a href="#reviews">(${reviewSummary.total_reviews || reviews.length} đánh giá)</a></div><div class="detail-meta-list"><div><span>Tác giả</span><strong>${book.author || 'Đang cập nhật'}</strong></div><div><span>Nhà xuất bản</span><strong>${book.publisher || 'Đang cập nhật'}</strong></div><div><span>Tình trạng</span><strong class="${book.stock > 0 ? 'stock-in' : 'stock-out'}">${book.stock > 0 ? `Còn hàng (${book.stock})` : 'Hết hàng'}</strong></div></div><div class="detail-price"><strong>${formatVND(prices.current)}</strong>${prices.discount ? `<del>${formatVND(prices.original)}</del><span>-${prices.discount}%</span>` : ''}</div><div class="detail-buy-row"><span>Số lượng</span><div class="detail-quantity"><button onclick="changeDetailQuantity(-1)">−</button><strong id="detail-quantity">1</strong><button onclick="changeDetailQuantity(1)">+</button></div></div><div class="detail-actions"><button class="btn-preview detail-cart-button" onclick="addDetailToCart(${book.id})">🛒 Thêm vào giỏ hàng</button><button class="btn-buy detail-buy-button" onclick="buyNow(${book.id}, Number(document.getElementById('detail-quantity').textContent))">⚡ Mua ngay</button></div><div class="detail-promise"><span>✓</span> Đọc thử miễn phí · Đổi trả trong 7 ngày · Giao hàng toàn quốc</div></div>
       </section>
       <section class="detail-section"><h2>Thông tin chi tiết</h2><div class="spec-grid"><div><span>Mã sản phẩm</span><strong>BH-${book.id}</strong></div><div><span>ISBN</span><strong>${book.isbn || 'Đang cập nhật'}</strong></div><div><span>Tác giả</span><strong>${book.author || 'Đang cập nhật'}</strong></div><div><span>Nhà xuất bản</span><strong>${book.publisher || 'Đang cập nhật'}</strong></div><div><span>Năm xuất bản</span><strong>${book.publication_year || new Date(book.created_at || Date.now()).getFullYear()}</strong></div><div><span>Ngôn ngữ</span><strong>${book.language || 'Tiếng Việt'}</strong></div><div><span>Số trang</span><strong>${book.page_count || 'Đang cập nhật'}</strong></div><div><span>Kích thước</span><strong>${book.size || '13 x 20 cm'}</strong></div><div><span>Loại bìa</span><strong>${book.cover_type === 'HARD' ? 'Bìa cứng' : 'Bìa mềm'}</strong></div><div><span>Thể loại</span><strong>${book.category?.name || book.category_name || 'Tổng hợp'}</strong></div></div></section>
       <section class="detail-section"><h2>Mô tả sản phẩm</h2><div id="detail-description" class="detail-description collapsed">${book.description || 'Mô tả sản phẩm đang được cập nhật.'}</div><button class="detail-more-button" onclick="toggleDetailDescription(this)">Xem thêm</button></section>
-      <section id="reviews" class="detail-section review-section"><div class="review-heading"><div><h2>Đánh giá sản phẩm</h2><div class="review-score"><span>★★★★★</span><strong>${Number(book.rating || 0).toFixed(1)} / 5</strong><small>${reviews.length} đánh giá</small></div></div><button class="btn-preview" onclick="${state.currentUser ? "showToast('Tính năng viết đánh giá đang được cập nhật.', 'info')" : "showAuthPage(); switchAuthTab('login')"}">${state.currentUser ? 'Viết đánh giá' : 'Đăng nhập để đánh giá'}</button></div><div class="review-distribution"><span>5 sao <i style="width:85%"></i> 85%</span><span>4 sao <i style="width:10%"></i> 10%</span><span>3 sao <i style="width:3%"></i> 3%</span><span>2 sao <i style="width:1%"></i> 1%</span><span>1 sao <i style="width:1%"></i> 1%</span></div><div class="review-filters"><button class="active" onclick="filterDetailReviews(0, this)">Tất cả</button>${[5,4,3,2,1].map(star => `<button onclick="filterDetailReviews(${star}, this)">${star} sao</button>`).join('')}</div><div id="detail-reviews-list">${renderDetailReviews(reviews)}</div></section>
+      <section id="reviews" class="detail-section review-section"><div class="review-heading"><div><h2>Đánh giá sản phẩm</h2><div class="review-score"><span>★★★★★</span><strong>${Number(reviewSummary.average_rating || book.rating || 0).toFixed(1)} / 5</strong><small>${reviewSummary.total_reviews || reviews.length} đánh giá</small></div></div><button class="btn-preview" onclick="${state.currentUser ? `openMyOrdersModal()` : `showAuthPage(); switchAuthTab('login')`} ">${state.currentUser ? 'Viết đánh giá' : 'Đăng nhập để đánh giá'}</button></div>${renderReviewDistribution(reviewSummary.rating_distribution || { '5': 0, '4': 0, '3': 0, '2': 0, '1': 0 })}<div class="review-filters"><button class="active" onclick="filterDetailReviews(0, this)">Tất cả</button>${[5,4,3,2,1].map(star => `<button onclick="filterDetailReviews(${star}, this)">${star} sao</button>`).join('')}</div><div id="detail-reviews-list">${renderDetailReviews(reviews)}</div></section>
       <section class="detail-section related-section"><div class="section-title-wrap"><h2>Có thể bạn cũng thích</h2><div><button class="related-arrow" onclick="scrollRelatedBooks(-1)">←</button><button class="related-arrow" onclick="scrollRelatedBooks(1)">→</button></div></div><div id="related-books-grid" class="related-books-grid">${renderBookCards(related, false)}</div></section>
     </main>`;
   root.style.display = 'block';
   root.dataset.detailBookId = book.id;
+  await loadBookReviews(book.id);
   resetPageScroll();
 }
 
@@ -1002,14 +1006,50 @@ function toggleDetailDescription(button) {
   button.textContent = description.classList.contains('collapsed') ? 'Xem thêm' : 'Thu gọn';
 }
 
-function renderDetailReviews(reviews) {
-  return reviews.length ? reviews.map(review => `<article class="review-item"><div class="review-avatar">${review.userName.charAt(0)}</div><div><div class="review-item-head"><strong>${review.userName}</strong><small>${review.date}</small></div><div class="review-stars">${'★'.repeat(review.rating)}${'☆'.repeat(5 - review.rating)}</div><p>${review.comment}</p><button class="review-helpful">👍 Hữu ích (${review.helpful})</button></div></article>`).join('') : '<p class="detail-muted">Chưa có đánh giá phù hợp.</p>';
+function renderReviewDistribution(distribution = { '5': 0, '4': 0, '3': 0, '2': 0, '1': 0 }) {
+  const total = Object.values(distribution).reduce((sum, val) => sum + Number(val || 0), 0) || 1;
+  return `<div class="review-distribution">${[5,4,3,2,1].map(star => {
+    const value = Number(distribution[String(star)] || 0);
+    const width = Math.round((value / total) * 100);
+    return `<span>${star} sao <i style="width:${width}%"></i> ${width}%</span>`;
+  }).join('')}</div>`;
+}
+
+function renderDetailReviews(reviews = []) {
+  if (!Array.isArray(reviews) || !reviews.length) return '<p class="detail-muted">Chưa có đánh giá phù hợp.</p>';
+  return reviews.map(review => {
+    const buyer = review.buyer_name || 'Người mua';
+    const date = review.created_at ? new Date(review.created_at).toLocaleDateString('vi-VN') : 'Gần đây';
+    const replyHtml = review.reply ? `<div class="review-reply"><strong>Phản hồi shop:</strong> ${review.reply.content}</div>` : '';
+    const avatar = (buyer.charAt(0) || 'U').toUpperCase();
+    return `<article class="review-item"><div class="review-avatar">${avatar}</div><div><div class="review-item-head"><strong>${buyer}</strong><small>${date}</small></div><div class="review-stars">${'★'.repeat(Number(review.rating || 0))}${'☆'.repeat(5 - Number(review.rating || 0))}</div><p>${(review.content || '').replace(/</g, '&lt;')}</p>${replyHtml}</div></article>`;
+  }).join('');
 }
 
 function filterDetailReviews(star, button) {
+  const root = document.getElementById('book-detail-root');
+  const bookId = Number(root?.dataset.detailBookId || 0);
+  const allReviews = state.productReviews[bookId] || [];
   document.querySelectorAll('.review-filters button').forEach(item => item.classList.remove('active'));
   button.classList.add('active');
-  document.getElementById('detail-reviews-list').innerHTML = renderDetailReviews(star ? detailReviews.filter(review => review.rating === star) : detailReviews);
+  const visible = star ? allReviews.filter(review => Number(review.rating) === Number(star)) : allReviews;
+  document.getElementById('detail-reviews-list').innerHTML = renderDetailReviews(visible);
+}
+
+async function loadBookReviews(bookId) {
+  if (!bookId) return;
+  try {
+    const summary = await apiCall(`/api/reviews/product/${bookId}`);
+    state.productReviews[bookId] = summary.reviews || [];
+    state.productReviewSummary[bookId] = summary;
+    const detailRoot = document.getElementById('book-detail-root');
+    if (!detailRoot || Number(detailRoot.dataset.detailBookId) !== Number(bookId)) return;
+    const reviewList = document.getElementById('detail-reviews-list');
+    if (reviewList) reviewList.innerHTML = renderDetailReviews(summary.reviews || []);
+  } catch (error) {
+    state.productReviews[bookId] = [];
+    state.productReviewSummary[bookId] = { total_reviews: 0, average_rating: 0, rating_distribution: { '5': 0, '4': 0, '3': 0, '2': 0, '1': 0 }, reviews: [] };
+  }
 }
 
 function scrollRelatedBooks(direction) {
@@ -1414,6 +1454,13 @@ async function openMyOrdersModal() {
         if (o.status === 'SHIPPING') statusBadge = '<span class="badge badge-info">Đang giao hàng</span>';
         if (o.status === 'DELIVERED') statusBadge = '<span class="badge badge-success">Đã giao thành công</span>';
 
+        const returnButton = o.status === 'DELIVERED'
+          ? `<button class="btn-secondary" style="padding:4px 10px; font-size:12px; margin-left:8px;" onclick="closeModal('my-orders-modal'); openReturnRequestModal(${o.id})">↩️ Yêu cầu trả hàng</button>`
+          : '';
+        const reviewButton = o.status === 'DELIVERED'
+          ? `<button class="btn-preview" style="padding:4px 10px; font-size:12px;" onclick="closeModal('my-orders-modal'); openOrderReviewModal(${o.id})">⭐ Đánh giá sản phẩm</button>`
+          : '';
+
         html += `
           <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:16px; margin-bottom:12px;">
             <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
@@ -1423,9 +1470,13 @@ async function openMyOrdersModal() {
             <div style="font-size:13px; color:#64748b; margin-bottom:8px;">
               Tổng tiền: <b style="color:#ef4444;">${formatVND(o.total_amount)}</b> | ${new Date(o.created_at).toLocaleDateString('vi-VN')}
             </div>
-            <button class="btn-primary" style="padding:4px 10px; font-size:12px;" onclick="closeModal('my-orders-modal'); openOrderTrackerModal(${o.id})">
-              🚚 Xem lộ trình vận chuyển
-            </button>
+            <div style="display:flex; gap:8px; flex-wrap:wrap;">
+              <button class="btn-primary" style="padding:4px 10px; font-size:12px;" onclick="closeModal('my-orders-modal'); openOrderTrackerModal(${o.id})">
+                🚚 Xem lộ trình vận chuyển
+              </button>
+              ${reviewButton}
+              ${returnButton}
+            </div>
           </div>
         `;
       });
@@ -1434,6 +1485,187 @@ async function openMyOrdersModal() {
 
     modal.classList.add('open');
   } catch (e) {}
+}
+
+async function openOrderReviewModal(orderId) {
+  if (!state.currentUser) {
+    requireLoginForAction('Đánh giá sản phẩm');
+    return;
+  }
+
+  try {
+    const order = await apiCall(`/api/orders/${orderId}`);
+    const formRoot = document.getElementById('review-form-root');
+    if (!formRoot) return;
+    formRoot.innerHTML = `
+      <div style="display:flex; flex-direction:column; gap:16px;">
+        <div>
+          <h4 style="margin:0 0 6px; font-size:16px;">Đơn hàng: ${order.order_code}</h4>
+          <p style="margin:0; color:#64748b; font-size:13px;">Mỗi sản phẩm chỉ được đánh giá một lần. Bạn có thể thêm ảnh minh họa nếu muốn.</p>
+        </div>
+        ${order.items.map(item => `
+          <div data-review-item="${item.id}" style="padding:12px; border:1px solid #e2e8f0; border-radius:10px; background:#f8fafc; display:flex; gap:12px; align-items:flex-start;">
+            <img src="${item.book_cover || 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?auto=format&fit=crop&q=80&w=80'}" style="width:56px; height:72px; object-fit:cover; border-radius:8px;">
+            <div style="flex:1; min-width:0;">
+              <div style="font-weight:700; margin-bottom:8px;">${item.book_title}</div>
+              <div class="review-stars" style="margin-bottom:8px;">
+                ${[5,4,3,2,1].map(star => `<label style="cursor:pointer; color:#fbbf24; font-size:18px; margin-right:4px;"><input type="radio" name="rating-${item.id}" value="${star}" style="display:none;">★</label>`).join('')}
+              </div>
+              <textarea rows="3" placeholder="Viết nhận xét của bạn về sản phẩm..." style="width:100%; resize:vertical; border:1px solid #cbd5e1; border-radius:8px; padding:10px 12px; font-size:13px;" data-review-content="${item.id}"></textarea>
+              <input type="text" placeholder="URL ảnh minh họa (tuỳ chọn)" style="width:100%; margin-top:8px; border:1px solid #cbd5e1; border-radius:8px; padding:8px 10px; font-size:13px;" data-review-image="${item.id}">
+              <div style="display:flex; justify-content:flex-end; margin-top:10px;">
+                <button class="btn-primary" style="padding:6px 12px; font-size:12px;" onclick="submitReviewItem(${order.id}, ${item.id}, ${item.book_id})">Gửi đánh giá</button>
+              </div>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    `;
+    document.getElementById('review-modal').classList.add('open');
+  } catch (error) {
+    showToast(error.message || 'Không thể mở form đánh giá.', 'error');
+  }
+}
+
+async function submitReviewItem(orderId, orderItemId, productId) {
+  const itemRoot = document.querySelector(`[data-review-item="${orderItemId}"]`);
+  if (!itemRoot) return;
+  const checked = itemRoot.querySelector('input[name="rating-' + orderItemId + '"]:checked');
+  const content = itemRoot.querySelector('[data-review-content="' + orderItemId + '"]').value.trim();
+  const imageInput = itemRoot.querySelector('[data-review-image="' + orderItemId + '"]');
+  const rating = Number(checked?.value || 0);
+  if (!rating) {
+    showToast('Vui lòng chọn số sao trước khi gửi đánh giá.', 'warning');
+    return;
+  }
+  if (!content) {
+    showToast('Vui lòng nhập nhận xét cho sản phẩm.', 'warning');
+    return;
+  }
+  try {
+    const body = {
+      order_id: Number(orderId),
+      order_item_id: Number(orderItemId),
+      product_id: Number(productId),
+      rating,
+      content,
+      images: imageInput && imageInput.value.trim() ? [imageInput.value.trim()] : []
+    };
+    await apiCall('/api/reviews', { method: 'POST', body: JSON.stringify(body) });
+    showToast('Đánh giá của bạn đã được gửi thành công.', 'success');
+    closeModal('review-modal');
+    await openMyOrdersModal();
+    if (state.currentUser && state.currentPortal !== 'SELLER') {
+      const book = state.books.find(item => item.id === Number(productId));
+      if (book) await loadBookReviews(book.id);
+    }
+  } catch (error) {
+    // keep the modal open so user can retry on validation errors
+  }
+}
+
+async function openReturnRequestModal(orderId) {
+  if (!state.currentUser) {
+    requireLoginForAction('Yêu cầu trả hàng');
+    return;
+  }
+
+  try {
+    const order = await apiCall(`/api/orders/${orderId}`);
+    const formRoot = document.getElementById('return-request-form');
+    if (!formRoot) return;
+
+    const itemOptions = order.items.map(item => `
+      <label style="display:flex; align-items:center; justify-content:space-between; gap:12px; padding:10px 12px; border:1px solid #e2e8f0; border-radius:8px; margin-bottom:8px; background:#fff;">
+        <span style="display:flex; align-items:center; gap:10px; min-width:0;">
+          <input type="checkbox" name="return-item" value="${item.id}" data-book-id="${item.book_id}" data-quantity="${item.quantity}" checked>
+          <img src="${item.book_cover || 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?auto=format&fit=crop&q=80&w=60'}" style="width:36px; height:48px; object-fit:cover; border-radius:5px;">
+          <span style="font-size:13px; color:#1e293b;">${item.book_title}<br><small>x${item.quantity}</small></span>
+        </span>
+        <span style="font-size:12px; font-weight:700; color:#ef4444;">${formatVND(item.price * item.quantity)}</span>
+      </label>
+    `).join('');
+
+    formRoot.innerHTML = `
+      <div style="display:flex; flex-direction:column; gap:16px;">
+        <div>
+          <h4 style="margin:0 0 6px; font-size:16px;">Đơn hàng: ${order.order_code}</h4>
+          <p style="margin:0; color:#64748b; font-size:13px;">Chọn tối thiểu một mặt hàng và nhập lý do trả.</p>
+        </div>
+        <div>
+          <label style="display:block; font-weight:700; font-size:13px; margin-bottom:8px;">Sản phẩm cần trả</label>
+          <div>${itemOptions || '<p class="text-muted">Không có mặt hàng nào trong đơn.</p>'}</div>
+        </div>
+        <div>
+          <label style="display:block; font-weight:700; font-size:13px; margin-bottom:8px;">Lý do trả</label>
+          <select id="return-reason" style="width:100%; border:1px solid #cbd5e1; border-radius:8px; padding:10px 12px;">
+            <option value="PRODUCT_DEFECT">Sản phẩm bị lỗi/hư hỏng</option>
+            <option value="WRONG_PRODUCT">Giao sai sản phẩm</option>
+            <option value="DESCRIPTION_MISMATCH">Không đúng mô tả</option>
+            <option value="MISSING_ITEM">Thiếu phụ kiện / thiếu hàng</option>
+            <option value="CHANGE_OF_MIND">Đổi ý</option>
+            <option value="OTHER">Lý do khác</option>
+          </select>
+        </div>
+        <div>
+          <label style="display:block; font-weight:700; font-size:13px; margin-bottom:8px;">Mô tả chi tiết</label>
+          <textarea id="return-description" rows="3" placeholder="Mô tả tình trạng sản phẩm" style="width:100%; resize:vertical; border:1px solid #cbd5e1; border-radius:8px; padding:10px 12px;"></textarea>
+        </div>
+        <div>
+          <label style="display:block; font-weight:700; font-size:13px; margin-bottom:8px;">Phương thức hoàn tiền</label>
+          <select id="return-method" style="width:100%; border:1px solid #cbd5e1; border-radius:8px; padding:10px 12px;">
+            <option value="BANK_TRANSFER">Chuyển khoản ngân hàng</option>
+            <option value="WALLET">Ví điện tử</option>
+            <option value="CASH">Tiền mặt</option>
+          </select>
+        </div>
+        <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:8px;">
+          <button class="btn-secondary" type="button" onclick="closeModal('return-request-modal')">Hủy</button>
+          <button class="btn-primary" type="button" onclick="submitReturnRequestForm(${order.id})">Gửi yêu cầu</button>
+        </div>
+      </div>
+    `;
+
+    document.getElementById('return-request-modal').classList.add('open');
+  } catch (error) {
+    showToast(error.message || 'Không thể mở form trả hàng', 'error');
+  }
+}
+
+async function submitReturnRequestForm(orderId) {
+  const selected = [...document.querySelectorAll('input[name="return-item"]:checked')];
+  if (!selected.length) {
+    showToast('Vui lòng chọn ít nhất 1 sản phẩm để trả.', 'warning');
+    return;
+  }
+
+  const body = {
+    order_id: orderId,
+    reason: document.getElementById('return-reason')?.value || 'OTHER',
+    description: document.getElementById('return-description')?.value || '',
+    refund_method: document.getElementById('return-method')?.value || 'BANK_TRANSFER',
+    items: selected.map(item => ({
+      order_item_id: Number(item.value),
+      product_id: Number(item.dataset.bookId),
+      quantity: Number(item.dataset.quantity || 1)
+    }))
+  };
+
+  try {
+    const result = await apiCall('/api/returns', {
+      method: 'POST',
+      body: JSON.stringify(body)
+    });
+    showToast('Đã gửi yêu cầu trả hàng thành công.', 'success');
+    closeModal('return-request-modal');
+    openMyOrdersModal();
+    if (state.currentPortal === 'ADMIN') {
+      await renderAdminReturnsLive();
+    }
+    return result;
+  } catch (error) {
+    return null;
+  }
 }
 
 // -------------------------------------------------------------
@@ -2215,9 +2447,63 @@ async function loadSellerOrders() {
       apiCall('/api/seller/orders').then(allOrders => updateSellerOrderCounts(allOrders)).catch(()=>{});
     }
 
+    await loadSellerReturnRequests();
     filterSellerOrdersUI();
   } catch (e) {
     console.error('Lỗi khi tải đơn hàng seller:', e);
+  }
+}
+
+async function loadSellerReturnRequests() {
+  try {
+    const list = await apiCall('/api/seller/returns');
+    const root = document.getElementById('seller-return-requests-list');
+    if (!root) return;
+
+    if (!list || list.length === 0) {
+      root.innerHTML = '<div style="padding: 16px; color: #64748b;">Chưa có yêu cầu trả hàng nào cho gian hàng của bạn.</div>';
+      return;
+    }
+
+    root.innerHTML = list.map(item => `
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:12px; padding:14px 16px; border:1px solid #e2e8f0; border-radius:10px; background:#f8fafc; margin-bottom:10px;">
+        <div>
+          <div style="font-weight:800; color:#1e293b; margin-bottom:6px;">#${item.id} • Đơn ${item.order_id}</div>
+          <div style="font-size:12px; color:#475569; margin-bottom:4px;">Lý do: <b>${item.reason}</b></div>
+          <div style="font-size:12px; color:#475569; margin-bottom:4px;">Số tiền hoàn dự kiến: <b>${formatVND(item.refund_amount)}</b></div>
+          <div style="font-size:12px; color:#475569;">Trạng thái: <span class="badge ${item.status === 'PENDING' ? 'badge-warning' : item.status === 'REJECTED' ? 'badge-danger' : item.status === 'REFUNDED' ? 'badge-success' : 'badge-info'}">${item.status}</span></div>
+        </div>
+        <div style="display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end;">
+          ${item.status === 'PENDING' ? `<button class="btn-success" style="padding:5px 10px; font-size:12px;" onclick="handleSellerReturnAction(${item.id}, 'approve')">Duyệt</button>` : ''}
+          ${item.status === 'PENDING' ? `<button class="btn-danger" style="padding:5px 10px; font-size:12px;" onclick="handleSellerReturnAction(${item.id}, 'reject')">Từ chối</button>` : ''}
+        </div>
+      </div>
+    `).join('');
+  } catch (error) {
+    const root = document.getElementById('seller-return-requests-list');
+    if (root) root.innerHTML = `<div style="padding:16px; color:#dc2626;">Không thể tải yêu cầu trả hàng: ${error.message}</div>`;
+  }
+}
+
+async function handleSellerReturnAction(returnId, action) {
+  try {
+    let payload = undefined;
+    if (action === 'reject') {
+      const rejectionReason = prompt('Nhập lý do từ chối yêu cầu trả hàng:');
+      if (rejectionReason === null || !rejectionReason.trim()) {
+        showToast('Bạn phải nhập lý do từ chối trước khi tiếp tục.', 'warning');
+        return;
+      }
+      payload = JSON.stringify({ rejection_reason: rejectionReason.trim() });
+    }
+
+    const endpoint = action === 'approve' ? `/api/seller/returns/${returnId}/approve` : `/api/seller/returns/${returnId}/reject`;
+    await apiCall(endpoint, { method: 'PATCH', body: payload });
+    showToast(action === 'approve' ? 'Đã duyệt yêu cầu trả hàng.' : 'Đã từ chối yêu cầu trả hàng.', 'success');
+    await loadSellerOrders();
+    await loadSellerDashboard();
+  } catch (error) {
+    showToast(error.message || 'Không thể cập nhật yêu cầu trả hàng.', 'error');
   }
 }
 
@@ -3077,10 +3363,11 @@ async function loadAdminDashboard() {
     setAdminCount('admin-sellers-badge', stats.pending_sellers);
     setAdminCount('admin-payouts-badge', stats.pending_payouts);
     setAdminCount('admin-payouts-menu-badge', stats.pending_payouts);
-    setAdminCount('admin-notification-count', pendingOrderCount + Number(stats.pending_disputes || 0) + Number(stats.pending_sellers || 0) + Number(stats.pending_books || 0) + Number(stats.pending_payouts || 0));
+    setAdminCount('admin-returns-badge', stats.pending_returns || 0);
+    setAdminCount('admin-notification-count', pendingOrderCount + Number(stats.pending_disputes || 0) + Number(stats.pending_sellers || 0) + Number(stats.pending_books || 0) + Number(stats.pending_payouts || 0) + Number(stats.pending_returns || 0));
     const kpis = [
       ['GMV', formatVND(summary.gmv ?? summary.total_gmv_gross), 'Tổng giá trị hàng hóa', 'money', 'dashboard'],
-      ['Doanh thu sàn', formatVND(summary.platform_revenue ?? summary.total_platform_profit), 'Commission + Ads + VIP', 'revenue', 'finance'],
+      ['Doanh thu sàn', formatVND(summary.platform_revenue ?? summary.total_platform_profit), 'Phí hoa hồng thực tế trên đơn hàng', 'revenue', 'finance'],
       ['Hoa hồng', formatVND(summary.commission_revenue || 0), 'Phí trên đơn hàng', 'commission', 'finance'],
       ['Đơn hàng', stats.total_orders, 'Đơn không bị hủy', 'orders', 'orders'],
       ['Người dùng', stats.total_users, 'Buyer, seller và admin', 'users', 'users'],
@@ -3091,6 +3378,11 @@ async function loadAdminDashboard() {
     const icons = { money: '₫', revenue: '↗', commission: '%', orders: '▤', users: '♙', sellers: '⌂', books: '▥', growth: '✦' };
     document.getElementById('admin-kpi-grid').innerHTML = kpis.map(([label, value, note, icon, view]) => `<button class="admin-kpi-card" onclick="switchAdminView('${view}')"><span class="admin-kpi-icon ${icon}">${icons[icon]}</span><span><b>${label}</b><strong>${value}</strong><small>${note}</small></span><i>→</i></button>`).join('');
     document.getElementById('admin-revenue-streams-wrap').innerHTML = summary.revenue_streams.map(stream => `<div class="admin-revenue-row"><span class="admin-revenue-icon">${stream.code === 'COMMISSION_FEE' ? '%' : stream.code === 'AD_REVENUE' ? '✦' : '♢'}</span><span><b>${stream.code === 'COMMISSION_FEE' ? 'Commission Revenue' : stream.code === 'AD_REVENUE' ? 'Advertising Revenue' : 'Other Revenue'}</b><small>${stream.description}</small></span><strong>${formatVND(stream.amount)}</strong></div>`).join('');
+    const platformRevenueValue = Number(summary.platform_revenue ?? summary.total_platform_profit ?? 0);
+    const gmvValue = Number(summary.gmv ?? summary.total_gmv_gross ?? 0);
+    if (platformRevenueValue > gmvValue && gmvValue > 0) {
+      console.warn('Dashboard revenue mismatch: platform revenue exceeds GMV. Using canonical commission-based metric.', { gmvValue, platformRevenueValue });
+    }
     document.getElementById('admin-action-queue').innerHTML = [`${stats.pending_books} sản phẩm chờ duyệt|products|Xem hàng đợi`, `${stats.pending_sellers} hồ sơ seller chờ duyệt|sellers|Kiểm tra hồ sơ`, `${stats.pending_payouts} yêu cầu rút tiền|payouts|Mở payout`, `${stats.pending_disputes} khiếu nại cần xử lý|disputes|Xem khiếu nại`].map(item => { const [text, view, action] = item.split('|'); return `<button onclick="switchAdminView('${view}')"><span>${text}</span><b>${action} →</b></button>`; }).join('');
     document.getElementById('admin-recent-activity').innerHTML = ['Doanh thu commission đã được cập nhật', `${stats.pending_books} sách mới được gửi xét duyệt`, `${stats.pending_sellers} hồ sơ seller đang chờ kiểm tra`, 'Hệ thống đối soát hoạt động bình thường'].map((text, index) => `<div><i class="admin-activity-dot dot-${index}"></i><span>${text}<small>${index + 1} giờ trước</small></span></div>`).join('');
     renderAdminGrowthChart(summary.gmv || summary.total_gmv_gross || 0, summary.platform_revenue || summary.total_platform_profit || 0);
@@ -3122,6 +3414,7 @@ function switchAdminView(view, button) {
   if (view === 'products') return loadPendingBooks();
   if (view === 'sellers') return loadPendingSellers();
   if (view === 'users') return loadAllUsersAdmin();
+  if (view === 'returns') return renderAdminReturnsLive();
   if (view === 'disputes') return renderAdminDisputes();
   if (view === 'payouts') return renderAdminPayouts();
   if (view === 'permissions') return renderAdminPermissions();
@@ -3150,6 +3443,52 @@ async function renderAdminTransactionsLive() {
   const root = document.getElementById('admin-module-view');
   root.innerHTML = adminModuleHeading('LIVE API', 'Tài chính & đối soát', 'Giao dịch đã ghi nhận trong database.') + '<div class="admin-table-wrap"><div class="admin-table-scroll"><table class="admin-data-table"><thead><tr><th>Mã giao dịch</th><th>Seller ID</th><th>Loại</th><th>Gross</th><th>Fee</th><th>Net</th><th>Trạng thái</th></tr></thead><tbody id="admin-live-transactions-body"><tr><td colspan="7" class="admin-empty-state">Đang tải...</td></tr></tbody></table></div></div>';
   try { const transactions = await apiCall('/api/admin/transactions'); document.getElementById('admin-live-transactions-body').innerHTML = transactions.length ? transactions.map(item => `<tr><td>${item.transaction_code}</td><td>${item.seller_id || '-'}</td><td>${item.transaction_type}</td><td>${formatVND(item.gross)}</td><td>${formatVND(item.fee)}</td><td>${formatVND(item.net)}</td><td><span class="admin-status ${item.status === 'PENDING' ? 'warning' : 'success'}">${item.status}</span></td></tr>`).join('') : '<tr><td colspan="7" class="admin-empty-state">Chưa có giao dịch được ghi nhận</td></tr>'; } catch (error) { document.getElementById('admin-live-transactions-body').innerHTML = `<tr><td colspan="7" class="admin-empty-state">Không thể tải dữ liệu: ${error.message}</td></tr>`; }
+}
+
+async function renderAdminReturnsLive() {
+  const root = document.getElementById('admin-module-view');
+  root.innerHTML = adminModuleHeading('RETURN & REFUND', 'Quản lý trả hàng', 'Danh sách yêu cầu trả hàng từ khách hàng cần xử lý.') + '<div class="admin-table-wrap"><div class="admin-table-toolbar"><input type="search" placeholder="Tìm mã trả hàng, đơn hàng, khách hàng..." oninput="filterAdminTable(this.value)"></div><div class="admin-table-scroll"><table class="admin-data-table"><thead><tr><th>ID</th><th>Đơn</th><th>Khách</th><th>Lý do</th><th>Số tiền</th><th>Trạng thái</th><th>Thao tác</th></tr></thead><tbody id="admin-live-returns-body"><tr><td colspan="7" class="admin-empty-state">Đang tải...</td></tr></tbody></table></div></div>';
+  try {
+    const requests = await apiCall('/api/admin/returns');
+    const rows = requests.length ? requests.map(req => `
+      <tr>
+        <td><b>#${req.id}</b></td>
+        <td>${req.order_id}</td>
+        <td>${req.user_id}</td>
+        <td>${req.reason}</td>
+        <td>${formatVND(req.refund_amount)}</td>
+        <td><span class="admin-status ${req.status === 'PENDING' ? 'warning' : req.status === 'REJECTED' ? 'danger' : req.status === 'REFUNDED' ? 'success' : 'info'}">${req.status}</span></td>
+        <td>
+          ${req.status === 'PENDING' ? `<button class="admin-row-action" onclick="handleAdminReturnAction(${req.id}, 'approve')">Duyệt</button>` : ''}
+          ${req.status === 'PENDING' ? `<button class="admin-row-action" onclick="handleAdminReturnAction(${req.id}, 'reject')">Từ chối</button>` : ''}
+          ${req.status === 'APPROVED' || req.status === 'CUSTOMER_SHIPPED' ? `<button class="admin-row-action" onclick="handleAdminReturnAction(${req.id}, 'received')">Đã nhận hàng</button>` : ''}
+          ${(req.status === 'RECEIVED' || req.status === 'REFUND_PROCESSING') ? `<button class="admin-row-action" onclick="handleAdminReturnAction(${req.id}, 'refund')">Hoàn tiền</button>` : ''}
+        </td>
+      </tr>
+    `).join('') : '<tr><td colspan="7" class="admin-empty-state">Chưa có yêu cầu trả hàng nào</td></tr>';
+    document.getElementById('admin-live-returns-body').innerHTML = rows;
+    document.getElementById('admin-returns-badge') && (document.getElementById('admin-returns-badge').textContent = String(requests.length));
+  } catch (error) {
+    document.getElementById('admin-live-returns-body').innerHTML = `<tr><td colspan="7" class="admin-empty-state">Không thể tải dữ liệu: ${error.message}</td></tr>`;
+  }
+}
+
+async function handleAdminReturnAction(returnId, action) {
+  try {
+    const endpointMap = {
+      approve: `/api/admin/returns/${returnId}/approve`,
+      reject: `/api/admin/returns/${returnId}/reject`,
+      received: `/api/admin/returns/${returnId}/received`,
+      refund: `/api/admin/returns/${returnId}/refund`
+    };
+    const method = 'PATCH';
+    const body = action === 'reject' ? JSON.stringify({ rejection_reason: 'Không đạt tiêu chí hoàn trả' }) : undefined;
+    await apiCall(endpointMap[action], { method, body });
+    showToast('Đã cập nhật trạng thái trả hàng.', 'success');
+    await renderAdminReturnsLive();
+  } catch (error) {
+    showToast(error.message || 'Không thể cập nhật trạng thái trả hàng.', 'error');
+  }
 }
 
 async function renderAdminAnalyticsLive() {
@@ -3420,6 +3759,120 @@ function closeModal(modalId) {
 // ================================================================
 
 let selectedRegisterRole = 'BUYER';
+let pendingSellerDocument = null;
+let pendingPublisherDocument = null;
+
+function clearFileInput(inputId, metaId, stateKey) {
+  const input = document.getElementById(inputId);
+  const meta = document.getElementById(metaId);
+  if (input) input.value = '';
+  if (meta) meta.textContent = 'Chưa có tệp nào được chọn';
+  if (stateKey === 'pendingSellerDocument') pendingSellerDocument = null;
+  if (stateKey === 'pendingPublisherDocument') pendingPublisherDocument = null;
+}
+
+function showPolicyPage(type) {
+  const url = type === 'terms' ? '/terms' : '/privacy';
+  window.location.href = url;
+}
+
+function showRegisterFormAgain() {
+  const registerForm = document.getElementById('register-form');
+  const verificationForm = document.getElementById('seller-verification-form');
+  if (registerForm) registerForm.classList.add('active');
+  if (verificationForm) verificationForm.classList.remove('active');
+  switchAuthTab('register');
+}
+
+function updateSellerVerificationVisibility() {
+  const sameAsOffice = document.getElementById('seller-same-address');
+  const shippingBlock = document.getElementById('seller-shipping-address-block');
+  if (!sameAsOffice || !shippingBlock) return;
+  const shouldShow = !sameAsOffice.checked;
+  shippingBlock.classList.toggle('hidden', !shouldShow);
+}
+
+function bindSellerVerificationEvents() {
+  const fileInput = document.getElementById('seller-document-input');
+  if (fileInput) {
+    fileInput.addEventListener('change', (event) => {
+      const file = event.target.files && event.target.files[0];
+      const meta = document.getElementById('seller-document-meta');
+      if (!file) {
+        pendingSellerDocument = null;
+        if (meta) meta.textContent = 'Chưa có tệp nào được chọn';
+        return;
+      }
+      const validTypes = ['application/pdf', 'image/jpeg', 'image/png', 'image/jpg'];
+      if (!validTypes.includes(file.type) && !['pdf', 'jpg', 'jpeg', 'png'].includes((file.name || '').split('.').pop()?.toLowerCase())) {
+        showToast('File không hợp lệ. Chỉ chấp nhận PDF, JPG, JPEG, PNG.', 'error');
+        event.target.value = '';
+        pendingSellerDocument = null;
+        if (meta) meta.textContent = 'Chưa có tệp nào được chọn';
+        return;
+      }
+      if (file.size > 5 * 1024 * 1024) {
+        showToast('Dung lượng file tối đa là 5MB.', 'error');
+        event.target.value = '';
+        pendingSellerDocument = null;
+        if (meta) meta.textContent = 'Chưa có tệp nào được chọn';
+        return;
+      }
+      pendingSellerDocument = file;
+      if (meta) {
+        const sizeMb = (file.size / (1024 * 1024)).toFixed(2);
+        meta.textContent = `${file.name} • ${sizeMb} MB • Đã upload`;
+      }
+    });
+  }
+
+  const publisherFileInput = document.getElementById('seller-publisher-document-input');
+  if (publisherFileInput) {
+    publisherFileInput.addEventListener('change', (event) => {
+      const file = event.target.files && event.target.files[0];
+      const meta = document.getElementById('seller-publisher-document-meta');
+      if (!file) {
+        pendingPublisherDocument = null;
+        if (meta) meta.textContent = 'Chưa có tệp nào được chọn';
+        return;
+      }
+      const validTypes = ['application/pdf', 'image/jpeg', 'image/png', 'image/jpg'];
+      if (!validTypes.includes(file.type) && !['pdf', 'jpg', 'jpeg', 'png'].includes((file.name || '').split('.').pop()?.toLowerCase())) {
+        showToast('File xuất bản không hợp lệ. Chỉ chấp nhận PDF, JPG, JPEG, PNG.', 'error');
+        event.target.value = '';
+        pendingPublisherDocument = null;
+        if (meta) meta.textContent = 'Chưa có tệp nào được chọn';
+        return;
+      }
+      if (file.size > 5 * 1024 * 1024) {
+        showToast('Dung lượng file xuất bản tối đa là 5MB.', 'error');
+        event.target.value = '';
+        pendingPublisherDocument = null;
+        if (meta) meta.textContent = 'Chưa có tệp nào được chọn';
+        return;
+      }
+      pendingPublisherDocument = file;
+      if (meta) {
+        const sizeMb = (file.size / (1024 * 1024)).toFixed(2);
+        meta.textContent = `${file.name} • ${sizeMb} MB • Đã upload`;
+      }
+    });
+  }
+
+  const sameAddressToggle = document.getElementById('seller-same-address');
+  if (sameAddressToggle) {
+    sameAddressToggle.addEventListener('change', updateSellerVerificationVisibility);
+  }
+
+  const sellerBusinessType = document.getElementById('seller-business-type');
+  if (sellerBusinessType) {
+    sellerBusinessType.addEventListener('change', () => {
+      const isPublisher = sellerBusinessType.value === 'PUBLISHER';
+      const publisherSection = document.getElementById('seller-publisher-doc-upload');
+      if (publisherSection) publisherSection.classList.toggle('hidden', !isPublisher);
+    });
+  }
+}
 
 function showPublicMarketplace() {
   const authPage = document.getElementById('auth-page');
@@ -3474,10 +3927,17 @@ async function enterMainApp() {
 }
 
 function switchAuthTab(tab) {
-  document.getElementById('tab-login').classList.toggle('active', tab === 'login');
-  document.getElementById('tab-register').classList.toggle('active', tab === 'register');
-  document.getElementById('login-form').classList.toggle('active', tab === 'login');
-  document.getElementById('register-form').classList.toggle('active', tab === 'register');
+  const loginTab = document.getElementById('tab-login');
+  const registerTab = document.getElementById('tab-register');
+  const loginForm = document.getElementById('login-form');
+  const registerForm = document.getElementById('register-form');
+  const verificationForm = document.getElementById('seller-verification-form');
+
+  if (loginTab) loginTab.classList.toggle('active', tab === 'login');
+  if (registerTab) registerTab.classList.toggle('active', tab === 'register');
+  if (loginForm) loginForm.classList.toggle('active', tab === 'login');
+  if (registerForm) registerForm.classList.toggle('active', tab === 'register');
+  if (verificationForm) verificationForm.classList.toggle('active', tab === 'seller-verification');
 }
 
 function selectRegisterRole(role) {
@@ -3485,10 +3945,31 @@ function selectRegisterRole(role) {
   document.querySelectorAll('.role-card').forEach(card => {
     card.classList.toggle('selected', card.dataset.role === role);
   });
-  
-  // Show/hide seller extra fields
+
+  const registerForm = document.getElementById('register-form');
+  const verificationForm = document.getElementById('seller-verification-form');
   const sellerFields = document.getElementById('seller-extra-fields');
-  sellerFields.classList.toggle('visible', role === 'SELLER');
+  const loginForm = document.getElementById('login-form');
+  const registerTab = document.getElementById('tab-register');
+  const loginTab = document.getElementById('tab-login');
+
+  if (role === 'SELLER') {
+    if (registerForm) registerForm.classList.remove('active');
+    if (verificationForm) verificationForm.classList.add('active');
+    if (loginForm) loginForm.classList.remove('active');
+    if (registerTab) registerTab.classList.add('active');
+    if (loginTab) loginTab.classList.remove('active');
+  } else {
+    if (registerForm) registerForm.classList.add('active');
+    if (verificationForm) verificationForm.classList.remove('active');
+    if (loginForm) loginForm.classList.remove('active');
+    if (registerTab) registerTab.classList.add('active');
+    if (loginTab) loginTab.classList.remove('active');
+  }
+
+  if (sellerFields) {
+    sellerFields.classList.toggle('visible', role === 'SELLER');
+  }
 }
 
 function togglePasswordVisibility(inputId, btn) {
@@ -3552,10 +4033,20 @@ async function handleRegister(event) {
   const username = document.getElementById('reg-username').value.trim();
   const password = document.getElementById('reg-password').value;
   const passwordConfirm = document.getElementById('reg-password-confirm').value;
-  const address = document.getElementById('reg-address').value.trim();
 
-  if (!fullName || !email || !username || !password) {
+  if (!email || !phone || !username || !password || !fullName || !passwordConfirm) {
     showToast('Vui lòng điền đầy đủ các trường bắt buộc (*)', 'warning');
+    return;
+  }
+
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    showToast('Email không hợp lệ', 'error');
+    return;
+  }
+
+  const digits = phone.replace(/\D/g, '');
+  if (digits.length < 9 || digits.length > 11) {
+    showToast('Số điện thoại không hợp lệ', 'error');
     return;
   }
 
@@ -3564,32 +4055,20 @@ async function handleRegister(event) {
     return;
   }
 
-  if (password.length < 4) {
-    showToast('Mật khẩu phải có ít nhất 4 ký tự', 'warning');
+  if (password.length < 8 || !/[A-Za-z]/.test(password) || !/[0-9]/.test(password)) {
+    showToast('Mật khẩu phải có ít nhất 8 ký tự, bao gồm chữ và số.', 'warning');
     return;
   }
 
   const payload = {
     username: username,
     email: email,
+    phone: phone,
     password: password,
+    password_confirmation: passwordConfirm,
     full_name: fullName,
     role: selectedRegisterRole,
-    phone: phone || null,
-    address: address || null
   };
-
-  // Add seller-specific fields
-  if (selectedRegisterRole === 'SELLER') {
-    const shopName = document.getElementById('reg-shop-name').value.trim();
-    if (!shopName) {
-      showToast('Vui lòng nhập tên Nhà Sách / NXB khi đăng ký Doanh nghiệp', 'warning');
-      return;
-    }
-    payload.shop_name = shopName;
-    payload.business_license = document.getElementById('reg-business-license').value.trim() || null;
-    payload.shop_description = document.getElementById('reg-shop-desc').value.trim() || null;
-  }
 
   try {
     const data = await apiCall('/api/auth/register', {
@@ -3599,16 +4078,23 @@ async function handleRegister(event) {
 
     state.token = data.access_token;
     state.currentUser = data.user;
-
-    // Save session
     localStorage.setItem('bookhub_token', data.access_token);
     localStorage.setItem('bookhub_user', JSON.stringify(data.user));
 
     if (selectedRegisterRole === 'SELLER') {
-      showToast(`Tạo tài khoản Doanh nghiệp thành công! Tài khoản đang chờ Admin xét duyệt uy tín trước khi mở bán.`, 'success');
-    } else {
-      showToast(`Tạo tài khoản thành công! Chào mừng ${data.user.full_name} đến BookHub!`, 'success');
+      showToast('Tạo tài khoản thành công! Hệ thống đã chuyển sang bước xác thực gian hàng.', 'success');
+      const registerForm = document.getElementById('register-form');
+      const verificationForm = document.getElementById('seller-verification-form');
+      if (registerForm) registerForm.classList.remove('active');
+      if (verificationForm) verificationForm.classList.add('active');
+      switchAuthTab('register');
+      const verificationFormElement = document.getElementById('seller-verification-form');
+      if (verificationFormElement) verificationFormElement.classList.add('active');
+      document.getElementById('seller-company-name')?.focus();
+      return;
     }
+
+    showToast(`Tạo tài khoản thành công! Chào mừng ${data.user.full_name} đến BookHub!`, 'success');
 
     const pendingBuyNow = JSON.parse(localStorage.getItem('bookhub_pending_buy_now') || 'null');
     if (pendingBuyNow) {
@@ -3619,6 +4105,150 @@ async function handleRegister(event) {
 
     await enterMainApp();
   } catch (e) {
+    // Error already shown by apiCall
+  }
+}
+
+async function handleSellerVerification(event) {
+  event.preventDefault();
+  if (selectedRegisterRole !== 'SELLER') {
+    showToast('Bước xác thực chỉ dành cho doanh nghiệp / nhà xuất bản.', 'warning');
+    return;
+  }
+
+  if (!state.currentUser) {
+    showToast('Bạn cần đăng nhập lại để tiếp tục xác thực gian hàng.', 'warning');
+    return;
+  }
+
+  const sellerBusinessType = document.getElementById('seller-business-type').value;
+  const sellerLegalBusinessName = document.getElementById('seller-legal-business-name').value.trim();
+  const sellerStoreName = document.getElementById('seller-store-name').value.trim();
+  const sellerTaxCode = document.getElementById('seller-tax-code').value.trim();
+  const sellerRepresentativeName = document.getElementById('seller-representative-name').value.trim();
+  const sellerRepresentativePosition = document.getElementById('seller-representative-position').value.trim();
+  const sellerRepresentativeId = document.getElementById('seller-representative-id').value.trim();
+  const sellerOfficeProvince = document.getElementById('seller-office-province').value.trim();
+  const sellerOfficeDistrict = document.getElementById('seller-office-district').value.trim();
+  const sellerOfficeWard = document.getElementById('seller-office-ward').value.trim();
+  const sellerOfficeStreet = document.getElementById('seller-office-street').value.trim();
+  const sellerBankHolder = document.getElementById('seller-bank-holder').value.trim();
+  const sellerBankAccount = document.getElementById('seller-bank-account').value.trim();
+  const sellerBankName = document.getElementById('seller-bank-name').value.trim();
+  const hasAcceptService = document.getElementById('seller-terms-service').checked;
+  const hasAcceptPrivacy = document.getElementById('seller-privacy-policy').checked;
+
+  const payload = {
+    business_type: sellerBusinessType,
+    company_name: sellerLegalBusinessName,
+    shop_name: sellerStoreName,
+    tax_code: sellerTaxCode,
+    company_email: document.getElementById('seller-company-email').value.trim(),
+    company_phone: document.getElementById('seller-company-phone').value.trim(),
+    legal_representative_name: sellerRepresentativeName,
+    legal_representative_position: sellerRepresentativePosition,
+    legal_representative_id_number: sellerRepresentativeId,
+    office_province: sellerOfficeProvince,
+    office_district: sellerOfficeDistrict,
+    office_ward: sellerOfficeWard,
+    office_street: sellerOfficeStreet,
+    shipping_same_as_office: document.getElementById('seller-same-address').checked,
+    shipping_province: document.getElementById('seller-shipping-province').value.trim(),
+    shipping_district: document.getElementById('seller-shipping-district').value.trim(),
+    shipping_ward: document.getElementById('seller-shipping-ward').value.trim(),
+    shipping_street: document.getElementById('seller-shipping-street').value.trim(),
+    bank_name: sellerBankName,
+    bank_account_number: sellerBankAccount,
+    bank_account_holder: sellerBankHolder,
+    terms_accepted: hasAcceptService && hasAcceptPrivacy,
+    documents: pendingSellerDocument ? [{ document_type: 'BUSINESS_LICENSE', document_id: 0 }] : []
+  };
+
+  const required = [
+    sellerBusinessType,
+    sellerLegalBusinessName,
+    sellerTaxCode,
+    sellerStoreName,
+    sellerRepresentativeName,
+    sellerRepresentativePosition,
+    sellerRepresentativeId,
+    sellerOfficeProvince,
+    sellerOfficeDistrict,
+    sellerOfficeWard,
+    sellerOfficeStreet,
+    sellerBankHolder,
+    sellerBankAccount,
+    sellerBankName,
+  ];
+  if (required.some(value => !value || !String(value).trim())) {
+    showToast('Vui lòng điền đầy đủ các trường bắt buộc trong hồ sơ doanh nghiệp.', 'warning');
+    return;
+  }
+
+  if (!hasAcceptService || !hasAcceptPrivacy) {
+    showToast('Bạn cần đồng ý với Điều khoản dịch vụ và Chính sách bảo mật trước khi gửi hồ sơ.', 'warning');
+    return;
+  }
+
+  if (!pendingSellerDocument) {
+    showToast('Bạn phải upload Giấy chứng nhận đăng ký doanh nghiệp / Giấy phép kinh doanh.', 'warning');
+    return;
+  }
+
+  if (sellerBusinessType === 'PUBLISHER' && !pendingPublisherDocument) {
+    showToast('Nhà xuất bản phải upload thêm Giấy tờ hoạt động xuất bản.', 'warning');
+    return;
+  }
+
+  try {
+    const uploadedFiles = [];
+    const businessUpload = await apiCall('/api/auth/seller/upload-document', {
+      method: 'POST',
+      body: (() => {
+        const formData = new FormData();
+        formData.append('file', pendingSellerDocument);
+        formData.append('document_type', 'BUSINESS_LICENSE');
+        return formData;
+      })()
+    });
+    uploadedFiles.push({ document_type: 'BUSINESS_LICENSE', document_id: businessUpload.id });
+
+    if (sellerBusinessType === 'PUBLISHER' && pendingPublisherDocument) {
+      const publisherUpload = await apiCall('/api/auth/seller/upload-document', {
+        method: 'POST',
+        body: (() => {
+          const formData = new FormData();
+          formData.append('file', pendingPublisherDocument);
+          formData.append('document_type', 'PUBLISHER_LICENSE');
+          return formData;
+        })()
+      });
+      uploadedFiles.push({ document_type: 'PUBLISHER_LICENSE', document_id: publisherUpload.id });
+    }
+
+    payload.documents = uploadedFiles;
+    const verificationResponse = await apiCall('/api/auth/seller/verification', {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    });
+
+    state.currentUser = verificationResponse;
+    localStorage.setItem('bookhub_user', JSON.stringify(verificationResponse));
+
+    const statusEl = document.getElementById('seller-success-status');
+    if (statusEl) {
+      statusEl.classList.remove('hidden');
+      statusEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+
+    const verificationForm = document.getElementById('seller-verification-form');
+    if (verificationForm) {
+      verificationForm.querySelector('button[type="submit"]').disabled = true;
+      verificationForm.querySelector('button[type="submit"]').textContent = 'Đã gửi hồ sơ';
+    }
+
+    showToast('Hồ sơ đã được gửi thành công. Trạng thái: ĐANG CHỜ DUYỆT.', 'success');
+  } catch (error) {
     // Error already shown by apiCall
   }
 }

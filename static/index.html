@@ -119,7 +119,6 @@
         <!-- ======== FORM ĐĂNG KÝ TÀI KHOẢN MỚI ======== -->
         <form id="register-form" class="auth-form" onsubmit="handleRegister(event)">
           
-          <!-- Chọn loại tài khoản -->
           <div class="role-selector">
             <label>Bạn muốn tạo tài khoản loại nào? <span class="required-star">*</span></label>
             <div class="role-cards">
@@ -138,29 +137,19 @@
             </div>
           </div>
 
-          <!-- Thông tin cơ bản -->
           <div class="auth-input-group">
-            <label>Họ và tên đầy đủ <span class="required-star">*</span></label>
+            <label>Email <span class="required-star">*</span></label>
             <div class="auth-input-wrap">
-              <span class="input-icon">👤</span>
-              <input type="text" id="reg-fullname" class="auth-input" placeholder="VD: Nguyễn Văn An" required>
+              <span class="input-icon">📧</span>
+              <input type="email" id="reg-email" class="auth-input" placeholder="email@gmail.com" required>
             </div>
           </div>
 
-          <div class="auth-two-col">
-            <div class="auth-input-group">
-              <label>Email <span class="required-star">*</span></label>
-              <div class="auth-input-wrap">
-                <span class="input-icon">📧</span>
-                <input type="email" id="reg-email" class="auth-input" placeholder="email@gmail.com" required>
-              </div>
-            </div>
-            <div class="auth-input-group">
-              <label>Số điện thoại</label>
-              <div class="auth-input-wrap">
-                <span class="input-icon">📱</span>
-                <input type="tel" id="reg-phone" class="auth-input" placeholder="0912 345 678">
-              </div>
+          <div class="auth-input-group">
+            <label>Số điện thoại <span class="required-star">*</span></label>
+            <div class="auth-input-wrap">
+              <span class="input-icon">📱</span>
+              <input type="tel" id="reg-phone" class="auth-input" placeholder="0912 345 678" required>
             </div>
           </div>
 
@@ -168,7 +157,7 @@
             <label>Tên đăng nhập <span class="required-star">*</span></label>
             <div class="auth-input-wrap">
               <span class="input-icon">🆔</span>
-              <input type="text" id="reg-username" class="auth-input" placeholder="VD: docgia_an (không dấu, không khoảng trắng)" required>
+              <input type="text" id="reg-username" class="auth-input" placeholder="VD: docgia_an" required>
             </div>
           </div>
 
@@ -177,12 +166,12 @@
               <label>Mật khẩu <span class="required-star">*</span></label>
               <div class="auth-input-wrap">
                 <span class="input-icon">🔒</span>
-                <input type="password" id="reg-password" class="auth-input" placeholder="Tối thiểu 6 ký tự" required minlength="4" autocomplete="new-password">
+                <input type="password" id="reg-password" class="auth-input" placeholder="Tối thiểu 8 ký tự" required minlength="8" autocomplete="new-password">
                 <button type="button" class="password-toggle" onclick="togglePasswordVisibility('reg-password', this)">👁️</button>
               </div>
             </div>
             <div class="auth-input-group">
-              <label>Xác nhận mật khẩu <span class="required-star">*</span></label>
+              <label>Nhập lại mật khẩu <span class="required-star">*</span></label>
               <div class="auth-input-wrap">
                 <span class="input-icon">🔒</span>
                 <input type="password" id="reg-password-confirm" class="auth-input" placeholder="Nhập lại mật khẩu" required autocomplete="new-password">
@@ -191,46 +180,256 @@
           </div>
 
           <div class="auth-input-group">
-            <label>Địa chỉ nhận hàng</label>
+            <label>Họ và tên đầy đủ <span class="required-star">*</span></label>
             <div class="auth-input-wrap">
-              <span class="input-icon">📍</span>
-              <input type="text" id="reg-address" class="auth-input" placeholder="VD: 123 Nguyễn Huệ, Quận 1, TP.HCM">
+              <span class="input-icon">👤</span>
+              <input type="text" id="reg-fullname" class="auth-input" placeholder="VD: Nguyễn Văn An" required>
             </div>
           </div>
 
-          <!-- Thông tin thêm cho Doanh Nghiệp / NXB -->
           <div id="seller-extra-fields" class="seller-extra-fields">
-            <div style="display:flex; align-items:center; gap:8px; margin-bottom:14px;">
-              <span style="font-size:18px;">🏢</span>
+            <div class="seller-empty-state">
+              <span>🏢</span>
               <div>
-                <div style="font-weight:800; font-size:14px; color:#1e293b;">Thông tin Doanh Nghiệp / NXB</div>
-                <div style="font-size:11px; color:#64748b;">Tài khoản sẽ được Admin xét duyệt uy tín trước khi mở bán (chống sách giả)</div>
+                <strong>Thông tin doanh nghiệp sẽ được bổ sung ở bước tiếp theo</strong>
+                <small>Đăng ký tài khoản trước, sau đó hệ thống sẽ chuyển sang xác thực gian hàng.</small>
               </div>
-            </div>
-
-            <div class="auth-input-group">
-              <label>Tên Nhà Sách / NXB <span class="required-star">*</span></label>
-              <input type="text" id="reg-shop-name" class="auth-input no-icon" placeholder="VD: NXB Kim Đồng Official Store">
-            </div>
-            <div class="auth-input-group">
-              <label>Giấy phép kinh doanh / Bản quyền xuất bản</label>
-              <input type="text" id="reg-business-license" class="auth-input no-icon" placeholder="VD: GPKD-KD-2024-8899">
-            </div>
-            <div class="auth-input-group">
-              <label>Mô tả gian hàng</label>
-              <textarea id="reg-shop-desc" class="auth-input no-icon" rows="2" placeholder="Giới thiệu ngắn gọn về nhà sách / NXB của bạn..." style="resize:vertical;"></textarea>
             </div>
           </div>
 
           <button type="submit" class="auth-submit-btn">
-            ✨ Tạo Tài Khoản & Bắt Đầu
+            ✨ Tạo Tài Khoản & Tiếp Tục
           </button>
 
           <p class="auth-terms">
-            Bằng việc tạo tài khoản, bạn đồng ý với 
-            <a href="#">Điều khoản sử dụng</a> và 
-            <a href="#">Chính sách bảo mật</a> của BookHub.
+            Bằng việc tạo tài khoản, bạn đồng ý với
+            <a href="#" onclick="event.preventDefault(); showPolicyPage('terms')">Điều khoản dịch vụ</a> và
+            <a href="#" onclick="event.preventDefault(); showPolicyPage('privacy')">Chính sách bảo mật</a> của BookHub.
           </p>
+        </form>
+
+        <form id="seller-verification-form" class="auth-form seller-verification-form" onsubmit="handleSellerVerification(event)">
+          <div class="seller-verification-header">
+            <span>🏢</span>
+            <div>
+              <h3>Bước 2: Xác thực doanh nghiệp / NXB</h3>
+              <p>BookHub sẽ kiểm tra hồ sơ trước khi cấp quyền bán hàng.</p>
+            </div>
+          </div>
+
+          <div class="seller-step-badge">BƯỚC 2 · GỬI HỒ SƠ XÉT DUYỆT</div>
+
+          <div class="seller-form-section">
+            <h4>THÔNG TIN PHÁP NHÂN DOANH NGHIỆP</h4>
+            <div class="auth-input-group">
+              <label>Loại hình đơn vị <span class="required-star">*</span></label>
+              <select id="seller-business-type" class="auth-input no-icon">
+                <option value="">-- Chọn loại hình --</option>
+                <option value="ENTERPRISE">Doanh nghiệp</option>
+                <option value="HOUSEHOLD">Hộ kinh doanh</option>
+                <option value="PUBLISHER">Nhà xuất bản</option>
+                <option value="OTHER">Khác</option>
+              </select>
+            </div>
+
+            <div class="auth-two-col">
+              <div class="auth-input-group">
+                <label>Tên pháp lý đầy đủ của doanh nghiệp/đơn vị <span class="required-star">*</span></label>
+                <input type="text" id="seller-legal-business-name" class="auth-input no-icon" placeholder="VD: Công ty TNHH Sách Việt">
+              </div>
+              <div class="auth-input-group">
+                <label>Mã số doanh nghiệp / MST <span class="required-star">*</span></label>
+                <input type="text" id="seller-tax-code" class="auth-input no-icon" placeholder="0101234567">
+              </div>
+            </div>
+
+            <div class="auth-two-col">
+              <div class="auth-input-group">
+                <label>Ngày cấp giấy chứng nhận đăng ký doanh nghiệp</label>
+                <input type="date" id="seller-registration-date" class="auth-input no-icon">
+              </div>
+              <div class="auth-input-group">
+                <label>Nơi cấp</label>
+                <input type="text" id="seller-registration-place" class="auth-input no-icon" placeholder="Sở KH&ĐT Hà Nội">
+              </div>
+            </div>
+
+            <div class="auth-two-col">
+              <div class="auth-input-group">
+                <label>Ngành nghề kinh doanh</label>
+                <input type="text" id="seller-business-industry" class="auth-input no-icon" placeholder="Bán lẻ sách, xuất bản, ...">
+              </div>
+              <div class="auth-input-group">
+                <label>Tên gian hàng hiển thị <span class="required-star">*</span></label>
+                <input type="text" id="seller-store-name" class="auth-input no-icon" placeholder="VD: Sách Việt Store">
+              </div>
+            </div>
+
+            <div class="auth-two-col">
+              <div class="auth-input-group">
+                <label>Email doanh nghiệp</label>
+                <input type="email" id="seller-company-email" class="auth-input no-icon" placeholder="contact@company.vn">
+              </div>
+              <div class="auth-input-group">
+                <label>Số điện thoại doanh nghiệp</label>
+                <input type="tel" id="seller-company-phone" class="auth-input no-icon" placeholder="0912 345 678">
+              </div>
+            </div>
+          </div>
+
+          <div class="seller-form-section">
+            <h4>GIẤY TỜ PHÁP LÝ</h4>
+            <div class="auth-input-group">
+              <label>Giấy chứng nhận đăng ký doanh nghiệp / Giấy phép kinh doanh <span class="required-star">*</span></label>
+              <div class="file-upload-box">
+                <input id="seller-document-input" type="file" accept=".pdf,.jpg,.jpeg,.png" class="file-input-hidden">
+                <label for="seller-document-input" class="file-upload-trigger">📎 Tải lên giấy tờ</label>
+                <div id="seller-document-meta" class="file-upload-meta">Chưa có tệp nào được chọn</div>
+                <div class="file-upload-actions">
+                  <button type="button" class="file-action-btn" onclick="document.getElementById('seller-document-input').click()">Thay file</button>
+                  <button type="button" class="file-action-btn danger" onclick="clearFileInput('seller-document-input', 'seller-document-meta', 'pendingSellerDocument')">Xóa file</button>
+                </div>
+              </div>
+            </div>
+
+            <div id="seller-publisher-doc-upload" class="auth-input-group hidden">
+              <label>Giấy tờ hoạt động xuất bản</label>
+              <div class="file-upload-box">
+                <input id="seller-publisher-document-input" type="file" accept=".pdf,.jpg,.jpeg,.png" class="file-input-hidden">
+                <label for="seller-publisher-document-input" class="file-upload-trigger">📎 Tải lên giấy phép/tài liệu xuất bản</label>
+                <div id="seller-publisher-document-meta" class="file-upload-meta">Chưa có tệp nào được chọn</div>
+                <div class="file-upload-actions">
+                  <button type="button" class="file-action-btn" onclick="document.getElementById('seller-publisher-document-input').click()">Thay file</button>
+                  <button type="button" class="file-action-btn danger" onclick="clearFileInput('seller-publisher-document-input', 'seller-publisher-document-meta', 'pendingPublisherDocument')">Xóa file</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="seller-form-section">
+            <h4>NGƯỜI ĐẠI DIỆN PHÁP LUẬT</h4>
+            <div class="auth-two-col">
+              <div class="auth-input-group">
+                <label>Họ và tên người đại diện <span class="required-star">*</span></label>
+                <input type="text" id="seller-representative-name" class="auth-input no-icon" placeholder="VD: Nguyễn Văn An">
+              </div>
+              <div class="auth-input-group">
+                <label>Chức vụ <span class="required-star">*</span></label>
+                <input type="text" id="seller-representative-position" class="auth-input no-icon" placeholder="VD: Giám đốc">
+              </div>
+            </div>
+            <div class="auth-input-group">
+              <label>Số CCCD / Hộ chiếu <span class="required-star">*</span></label>
+              <input type="text" id="seller-representative-id" class="auth-input no-icon" placeholder="VD: 012345678901">
+            </div>
+          </div>
+
+          <div class="seller-form-section">
+            <h4>ĐỊA CHỈ TRỤ SỞ CHÍNH</h4>
+            <div class="auth-two-col">
+              <div class="auth-input-group">
+                <label>Tỉnh/Thành phố <span class="required-star">*</span></label>
+                <input type="text" id="seller-office-province" class="auth-input no-icon" placeholder="Hà Nội">
+              </div>
+              <div class="auth-input-group">
+                <label>Quận/Huyện <span class="required-star">*</span></label>
+                <input type="text" id="seller-office-district" class="auth-input no-icon" placeholder="Cầu Giấy">
+              </div>
+            </div>
+            <div class="auth-two-col">
+              <div class="auth-input-group">
+                <label>Phường/Xã <span class="required-star">*</span></label>
+                <input type="text" id="seller-office-ward" class="auth-input no-icon" placeholder="Dịch Vọng">
+              </div>
+              <div class="auth-input-group">
+                <label>Địa chỉ chi tiết <span class="required-star">*</span></label>
+                <input type="text" id="seller-office-street" class="auth-input no-icon" placeholder="123 Trần Duy Hưng">
+              </div>
+            </div>
+          </div>
+
+          <div class="seller-form-section">
+            <h4>ĐỊA CHỈ NHẬN/TRẢ HÀNG</h4>
+            <div class="shipping-address-toggle">
+              <label class="check-row">
+                <input id="seller-same-address" type="checkbox" checked>
+                <span>Địa chỉ nhận/trả hàng giống địa chỉ trụ sở chính</span>
+              </label>
+            </div>
+            <div id="seller-shipping-address-block" class="shipping-address-block hidden">
+              <div class="auth-two-col">
+                <div class="auth-input-group">
+                  <label>Tỉnh/Thành phố</label>
+                  <input type="text" id="seller-shipping-province" class="auth-input no-icon" placeholder="Đà Nẵng">
+                </div>
+                <div class="auth-input-group">
+                  <label>Quận/Huyện</label>
+                  <input type="text" id="seller-shipping-district" class="auth-input no-icon" placeholder="Hải Châu">
+                </div>
+              </div>
+              <div class="auth-two-col">
+                <div class="auth-input-group">
+                  <label>Phường/Xã</label>
+                  <input type="text" id="seller-shipping-ward" class="auth-input no-icon" placeholder="Thanh Bình">
+                </div>
+                <div class="auth-input-group">
+                  <label>Địa chỉ chi tiết</label>
+                  <input type="text" id="seller-shipping-street" class="auth-input no-icon" placeholder="124 Lê Duẩn">
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="seller-form-section">
+            <h4>THÔNG TIN THANH TOÁN & ĐỐI SOÁT</h4>
+            <div class="auth-two-col">
+              <div class="auth-input-group">
+                <label>Tên chủ tài khoản <span class="required-star">*</span></label>
+                <input type="text" id="seller-bank-holder" class="auth-input no-icon" placeholder="Tên chủ tài khoản">
+              </div>
+              <div class="auth-input-group">
+                <label>Số tài khoản <span class="required-star">*</span></label>
+                <input type="text" id="seller-bank-account" class="auth-input no-icon" placeholder="1012345678">
+              </div>
+            </div>
+            <div class="auth-two-col">
+              <div class="auth-input-group">
+                <label>Ngân hàng <span class="required-star">*</span></label>
+                <input type="text" id="seller-bank-name" class="auth-input no-icon" placeholder="Vietcombank">
+              </div>
+              <div class="auth-input-group">
+                <label>Chi nhánh ngân hàng</label>
+                <input type="text" id="seller-bank-branch" class="auth-input no-icon" placeholder="Chi nhánh Hà Nội">
+              </div>
+            </div>
+          </div>
+
+          <div class="seller-form-section">
+            <h4>ĐIỀU KHOẢN & CHÍNH SÁCH</h4>
+            <div class="terms-box compact-terms">
+              <label class="check-row">
+                <input id="seller-terms-service" type="checkbox">
+                <span>Tôi đã đọc và đồng ý với <a href="#" onclick="event.preventDefault(); showPolicyPage('terms')">Điều khoản dịch vụ</a> của BookHub. <span class="required-star">*</span></span>
+              </label>
+            </div>
+            <div class="terms-box compact-terms">
+              <label class="check-row">
+                <input id="seller-privacy-policy" type="checkbox">
+                <span>Tôi đã đọc và đồng ý với <a href="#" onclick="event.preventDefault(); showPolicyPage('privacy')">Chính sách bảo mật</a> của BookHub. <span class="required-star">*</span></span>
+              </label>
+            </div>
+          </div>
+
+          <div class="auth-button-row">
+            <button type="button" class="auth-secondary-btn" onclick="showRegisterFormAgain()">Quay lại</button>
+            <button type="submit" class="auth-submit-btn compact">Gửi hồ sơ xét duyệt</button>
+          </div>
+
+          <div id="seller-success-status" class="seller-success-status hidden">
+            <h4>Hồ sơ đã được gửi thành công</h4>
+            <p>Trạng thái: <strong>ĐANG CHỜ DUYỆT</strong></p>
+            <small>BookHub sẽ kiểm tra thông tin trước khi cấp quyền bán hàng.</small>
+          </div>
         </form>
 
       </div>
@@ -840,6 +1039,18 @@
         </button>
       </div>
 
+      <div class="seller-card-box" style="margin: 0 0 16px;">
+        <div class="seller-card-header">
+          <div>
+            <h3 class="seller-card-title">↩️ Yêu Cầu Trả Hàng / Hoàn Tiền</h3>
+            <p class="seller-card-subtitle">Kiểm tra đơn hàng khách đã yêu cầu trả, approve hoặc từ chối kèm lý do rõ ràng.</p>
+          </div>
+        </div>
+        <div id="seller-return-requests-list" class="seller-reviews-wrap">
+          <div style="padding: 16px; color: #64748b;">Đang tải yêu cầu trả hàng...</div>
+        </div>
+      </div>
+
       <!-- Danh sách đơn hàng -->
       <div class="custom-table-wrap">
         <table class="custom-table">
@@ -1118,7 +1329,8 @@
         <button class="admin-nav-item" data-admin-view="orders" onclick="switchAdminView('orders', this)"><span>▤</span>Đơn hàng & khiếu nại <em id="admin-orders-badge">0</em></button>
         <button class="admin-nav-item admin-nav-subitem" data-admin-view="orders" onclick="switchAdminView('orders', this)"><span>↳</span>Tất cả đơn hàng</button>
         <button class="admin-nav-item admin-nav-subitem" data-admin-view="orders" onclick="switchAdminView('orders', this)"><span>↳</span>Đơn chờ xử lý</button>
-        <button class="admin-nav-item admin-nav-subitem" data-admin-view="orders" onclick="switchAdminView('orders', this)"><span>↳</span>Hoàn tiền / trả hàng</button>
+        <button class="admin-nav-item admin-nav-subitem" data-admin-view="returns" onclick="switchAdminView('returns', this)"><span>↳</span>Hoàn tiền / trả hàng</button>
+        <button class="admin-nav-item" data-admin-view="returns" onclick="switchAdminView('returns', this)"><span>↺</span>Quản lý trả hàng <em id="admin-returns-badge">0</em></button>
         <button class="admin-nav-item" data-admin-view="disputes" onclick="switchAdminView('disputes', this)"><span>!</span>Khiếu nại / tranh chấp <em id="admin-disputes-badge">0</em></button>
         <button class="admin-nav-item" data-admin-view="products" onclick="switchAdminView('products', this)"><span>▥</span>Sản phẩm <em id="admin-products-badge">0</em></button>
         <button class="admin-nav-item admin-nav-subitem" data-admin-view="products" onclick="switchAdminView('products', this)"><span>↳</span>Tất cả sản phẩm</button>
@@ -1398,6 +1610,30 @@
       </div>
       <div class="modal-body">
         <div id="my-orders-list"></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="return-request-modal" class="modal-overlay">
+    <div class="modal-box" style="max-width: 620px;">
+      <div class="modal-header">
+        <h3 class="modal-title">↩️ Yêu cầu trả hàng</h3>
+        <button class="close-modal-btn" onclick="closeModal('return-request-modal')">✕</button>
+      </div>
+      <div class="modal-body">
+        <div id="return-request-form"></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="review-modal" class="modal-overlay">
+    <div class="modal-box" style="max-width: 760px;">
+      <div class="modal-header">
+        <h3 class="modal-title">⭐ Đánh giá sản phẩm</h3>
+        <button class="close-modal-btn" onclick="closeModal('review-modal')">✕</button>
+      </div>
+      <div class="modal-body">
+        <div id="review-form-root"></div>
       </div>
     </div>
   </div>
