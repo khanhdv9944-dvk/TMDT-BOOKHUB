@@ -12,7 +12,6 @@ from routes.seller_routes import router as seller_router
 from routes.admin_routes import router as admin_router
 from routes.vip_routes import router as vip_router
 from routes.notification_routes import router as notification_router
-from routes.returns_routes import router as returns_router
 from routes.reviews_routes import router as reviews_router
 from seed_data import seed_database
 
@@ -47,7 +46,6 @@ app.include_router(seller_router)
 app.include_router(admin_router)
 app.include_router(vip_router)
 app.include_router(notification_router)
-app.include_router(returns_router)
 app.include_router(reviews_router)
 
 # Mount static assets explicitly so Vercel serves the same URLs as local FastAPI.
