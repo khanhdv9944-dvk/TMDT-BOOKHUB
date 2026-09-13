@@ -34,10 +34,10 @@ def list_books(
     limit: int = 50,
     db: Session = Depends(get_db)
 ):
+    # Build base query without is_out_of_stock filter (may not exist on Vercel)
     query = db.query(models.Book).filter(
         models.Book.status == models.BookStatus.APPROVED.value,
-        models.Book.is_visible.is_(True),
-        models.Book.is_out_of_stock.is_(False)
+        models.Book.is_visible.is_(True)
     )
     
     if q:
@@ -60,11 +60,29 @@ def list_books(
         query = query.filter(models.Book.is_featured_ad == is_featured)
 
     # Ưu tiên sách có Quảng cáo tài trợ lên đầu (Featured Ad Top), sau đó đến bán chạy / mới nhất
-    books = query.order_by(
+    query = query.order_by(
         desc(models.Book.is_featured_ad),
         desc(models.Book.sold_count),
         desc(models.Book.created_at)
-    ).limit(limit).all()
+    ).limit(limit)
+    
+    # Execute query and handle is_out_of_stock filtering
+    try:
+        books = query.all()
+    except Exception as e:
+        # If query fails (e.g., missing column), retry without complex filters
+        if "is_out_of_stock" in str(e):
+            # Database schema issue - fallback query
+            books = db.query(models.Book).filter(
+                models.Book.status == models.BookStatus.APPROVED.value,
+                models.Book.is_visible.is_(True)
+            ).order_by(
+                desc(models.Book.is_featured_ad),
+                desc(models.Book.sold_count),
+                desc(models.Book.created_at)
+            ).limit(limit).all()
+        else:
+            raise
 
     # Thêm thông tin liên quan
     results = []
@@ -103,11 +121,24 @@ def list_books(
 @router.get("/recommendations", response_model=List[schemas.BookOut])
 def get_recommendations(db: Session = Depends(get_db)):
     """Gợi ý sách hợp gu độc giả: kết hợp sách đánh giá cao, bán chạy và tuyển chọn"""
-    books = db.query(models.Book).filter(
+    query = db.query(models.Book).filter(
         models.Book.status == models.BookStatus.APPROVED.value,
-        models.Book.is_visible.is_(True),
-        models.Book.is_out_of_stock.is_(False)
-    ).order_by(desc(models.Book.rating), desc(models.Book.sold_count)).limit(6).all()
+        models.Book.is_visible.is_(True)
+    ).order_by(desc(models.Book.rating), desc(models.Book.sold_count)).limit(6)
+    
+    # Execute query and handle is_out_of_stock filtering
+    try:
+        books = query.all()
+    except Exception as e:
+        # If query fails (e.g., missing column), retry without complex filters
+        if "is_out_of_stock" in str(e):
+            # Database schema issue - fallback query
+            books = db.query(models.Book).filter(
+                models.Book.status == models.BookStatus.APPROVED.value,
+                models.Book.is_visible.is_(True)
+            ).order_by(desc(models.Book.rating), desc(models.Book.sold_count)).limit(6).all()
+        else:
+            raise
 
     results = []
     for b in books:

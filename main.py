@@ -35,9 +35,8 @@ def initialize_database():
         print(f"Database initialization error: {e}")
         _db_initialized = True  # Đánh dấu đã try, tránh loop
 
-# Khởi tạo DB ngay trên startup nếu không phải Vercel
-if not os.getenv("VERCEL"):
-    initialize_database()
+# Khởi tạo DB ngay trên startup
+initialize_database()
 
 app = FastAPI(
     title="BookHub - Sàn TMĐT Sách Đa Vai Trò",
