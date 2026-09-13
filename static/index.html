@@ -1000,6 +1000,7 @@
             <button class="seller-pill-btn" data-filter="APPROVED" onclick="setSellerBookFilter('APPROVED', this)">Đang mở bán (<span id="count-book-approved">0</span>)</button>
             <button class="seller-pill-btn" data-filter="PENDING" onclick="setSellerBookFilter('PENDING', this)">Chờ duyệt (<span id="count-book-pending">0</span>)</button>
             <button class="seller-pill-btn" data-filter="LOW_STOCK" onclick="setSellerBookFilter('LOW_STOCK', this)">⚠️ Sắp hết hàng (<span id="count-book-lowstock">0</span>)</button>
+            <button class="seller-pill-btn" data-filter="OUT_OF_STOCK" onclick="setSellerBookFilter('OUT_OF_STOCK', this)">🚫 Hết hàng / Đã ẩn (<span id="count-book-outofstock">0</span>)</button>
             <button class="seller-pill-btn" data-filter="REJECTED" onclick="setSellerBookFilter('REJECTED', this)">Bị từ chối (<span id="count-book-rejected">0</span>)</button>
           </div>
         </div>
@@ -1015,7 +1016,9 @@
           <span>Đã chọn: <b id="seller-selected-books-count">0</b> cuốn sách</span>
         </div>
         <div class="bulk-bar-actions">
-          <button class="btn-sm btn-primary" onclick="bulkSetStockPrompt()">⚡ Cập nhật tồn kho nhanh</button>
+          <button class="btn-sm btn-warning" onclick="bulkMarkOutOfStock(true)" title="Đánh dấu hết hàng và tự động ẩn khỏi sàn">🚫 Báo Hết Hàng (Ẩn sàn)</button>
+          <button class="btn-sm btn-success" onclick="bulkMarkOutOfStock(false)" title="Mở bán lại trên sàn TMĐT">✅ Báo Còn Hàng (Mở sàn)</button>
+          <button class="btn-sm btn-primary" onclick="bulkSetStockPrompt()">⚡ Cập nhật tồn kho</button>
           <button class="btn-sm btn-danger" onclick="bulkDeleteBooks()">🗑️ Xóa đã chọn</button>
           <button class="btn-sm btn-secondary" onclick="deselectAllSellerBooks()">✕ Hủy chọn</button>
         </div>
@@ -1033,6 +1036,7 @@
               <th>Thể Loại</th>
               <th>Giá Bán & Khuyến Mãi</th>
               <th style="min-width:130px;">Tồn Kho (Sửa nhanh)</th>
+              <th style="text-align:center; min-width:125px;">Hết Hàng (Ẩn sàn)</th>
               <th>Đã Bán</th>
               <th>Đánh Giá</th>
               <th>Trạng Thái Duyệt</th>

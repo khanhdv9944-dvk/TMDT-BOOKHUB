@@ -2468,15 +2468,17 @@ async function loadSellerBooks() {
 
     // Cập nhật số lượng đếm trên các Tab lọc
     const countAll = books.length;
-    const countApproved = books.filter(b => b.status === 'APPROVED').length;
+    const countApproved = books.filter(b => b.status === 'APPROVED' && !b.is_out_of_stock).length;
     const countPending = books.filter(b => b.status === 'PENDING').length;
-    const countLowStock = books.filter(b => b.stock <= 5).length;
+    const countLowStock = books.filter(b => b.stock <= 5 && !b.is_out_of_stock).length;
+    const countOutOfStock = books.filter(b => b.is_out_of_stock || b.is_visible === false).length;
     const countRejected = books.filter(b => b.status === 'REJECTED').length;
 
     if (document.getElementById('count-book-all')) document.getElementById('count-book-all').textContent = countAll;
     if (document.getElementById('count-book-approved')) document.getElementById('count-book-approved').textContent = countApproved;
     if (document.getElementById('count-book-pending')) document.getElementById('count-book-pending').textContent = countPending;
     if (document.getElementById('count-book-lowstock')) document.getElementById('count-book-lowstock').textContent = countLowStock;
+    if (document.getElementById('count-book-outofstock')) document.getElementById('count-book-outofstock').textContent = countOutOfStock;
     if (document.getElementById('count-book-rejected')) document.getElementById('count-book-rejected').textContent = countRejected;
 
     filterSellerBooksUI();
@@ -2512,16 +2514,17 @@ function filterSellerBooksUI() {
 
     // Lọc theo trạng thái
     let matchFilter = true;
-    if (filter === 'APPROVED') matchFilter = (b.status === 'APPROVED');
+    if (filter === 'APPROVED') matchFilter = (b.status === 'APPROVED' && !b.is_out_of_stock);
     else if (filter === 'PENDING') matchFilter = (b.status === 'PENDING');
-    else if (filter === 'LOW_STOCK') matchFilter = (b.stock <= 5);
+    else if (filter === 'LOW_STOCK') matchFilter = (b.stock <= 5 && !b.is_out_of_stock);
+    else if (filter === 'OUT_OF_STOCK') matchFilter = (b.is_out_of_stock || b.is_visible === false);
     else if (filter === 'REJECTED') matchFilter = (b.status === 'REJECTED');
 
     return matchSearch && matchFilter;
   });
 
   if (filtered.length === 0) {
-    container.innerHTML = `<tr><td colspan="10" style="text-align:center; padding:30px; color:#94a3b8;">Không tìm thấy cuốn sách nào phù hợp</td></tr>`;
+    container.innerHTML = `<tr><td colspan="11" style="text-align:center; padding:30px; color:#94a3b8;">Không tìm thấy cuốn sách nào phù hợp</td></tr>`;
     return;
   }
 
@@ -2530,6 +2533,7 @@ function filterSellerBooksUI() {
     let statusBadge = '<span class="badge badge-success">✓ Đang mở bán</span>';
     if (b.status === 'PENDING') statusBadge = '<span class="badge badge-warning">⏳ Chờ duyệt</span>';
     if (b.status === 'REJECTED') statusBadge = '<span class="badge badge-danger">❌ Bị từ chối</span>';
+    if (b.is_out_of_stock) statusBadge = '<span class="badge badge-danger">🚫 Hết hàng (Đã ẩn)</span>';
 
     // Cảnh báo tồn kho thấp + clickable inline edit
     const isLow = b.stock <= 5;
@@ -2541,19 +2545,34 @@ function filterSellerBooksUI() {
       </span>
     `;
 
+    // Toggle switch Hết hàng / Còn hàng
+    const isOutOfStock = b.is_out_of_stock || false;
+    const outOfStockToggle = `
+      <div style="display:flex; flex-direction:column; align-items:center; gap:4px;">
+        <label class="stock-out-switch" title="${isOutOfStock ? 'Bấm để mở bán lại' : 'Bấm để đánh dấu hết hàng và ẩn khỏi sàn'}">
+          <input type="checkbox" ${isOutOfStock ? 'checked' : ''} onchange="toggleBookOutOfStock(${b.id}, this.checked)">
+          <span class="stock-out-slider"></span>
+        </label>
+        <span class="stock-out-label-text ${isOutOfStock ? 'out-stock' : 'in-stock'}">
+          ${isOutOfStock ? '🚫 Hết hàng' : '✅ Còn hàng'}
+        </span>
+      </div>
+    `;
+
     let formatLabel = b.book_format === 'EBOOK' ? 'Ebook' : (b.book_format === 'AUDIOBOOK' ? 'Audiobook' : 'Sách giấy');
     const isChecked = sellerState.selectedBookIds.has(b.id) ? 'checked' : '';
+    const rowClass = isOutOfStock ? 'seller-book-row is-out-of-stock' : 'seller-book-row';
 
     html += `
-      <tr>
+      <tr class="${rowClass}">
         <td style="text-align:center;">
           <input type="checkbox" class="seller-book-select-cb" data-id="${b.id}" ${isChecked} onchange="toggleSelectSellerBook(${b.id}, this.checked)">
         </td>
         <td>
           <div style="display:flex; align-items:center; gap:12px;">
-            <img src="${b.cover_image || 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?auto=format&fit=crop&q=80&w=100'}" style="width:42px; height:58px; object-fit:cover; border-radius:4px; box-shadow:0 2px 4px rgba(0,0,0,0.1);">
+            <img src="${b.cover_image || 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?auto=format&fit=crop&q=80&w=100'}" style="width:42px; height:58px; object-fit:cover; border-radius:4px; box-shadow:0 2px 4px rgba(0,0,0,0.1); ${isOutOfStock ? 'opacity:0.5; filter:grayscale(50%);' : ''}">
             <div>
-              <div style="font-weight:700; font-size:14px; color:#1e293b; max-width:240px; line-height:1.3;">${b.title}</div>
+              <div style="font-weight:700; font-size:14px; color:${isOutOfStock ? '#94a3b8' : '#1e293b'}; max-width:240px; line-height:1.3;">${b.title}</div>
               <div style="font-size:11px; color:#64748b; margin-top:2px;">
                 Tác giả: <b>${b.author}</b> ${b.translator ? `(Dịch: ${b.translator})` : ''}
               </div>
@@ -2569,6 +2588,7 @@ function filterSellerBooksUI() {
           ${b.discount_price ? `<div style="font-size:11px; text-decoration:line-through; color:#94a3b8;">${formatVND(b.price)}</div>` : ''}
         </td>
         <td>${stockBadge}</td>
+        <td style="text-align:center;">${outOfStockToggle}</td>
         <td><b>${b.sold_count || 0}</b> cuốn</td>
         <td>
           <span class="seller-rating-pill">⭐ ${Number(b.rating || 5.0).toFixed(1)}</span>
@@ -2689,6 +2709,63 @@ async function bulkSetStockPrompt() {
   deselectAllSellerBooks();
   await loadSellerBooks();
   await loadSellerDashboard();
+}
+
+// ============================================================================
+// TOGGLE HẾT HÀNG / CÒN HÀNG (Tự động khóa & ẩn sàn / mở bán lại)
+// ============================================================================
+async function toggleBookOutOfStock(bookId, isOutOfStock) {
+  try {
+    const data = await apiCall(`/api/seller/books/${bookId}/toggle-out-of-stock`, {
+      method: 'POST',
+      body: JSON.stringify({ is_out_of_stock: isOutOfStock })
+    });
+    showToast(data.message || (isOutOfStock ? 'Đã đánh dấu hết hàng! Sản phẩm đã tự động bị khóa và ẩn khỏi sàn.' : 'Đã mở bán lại sản phẩm trên sàn TMĐT!'), isOutOfStock ? 'warning' : 'success');
+
+    // Cập nhật local state ngay lập tức
+    const bookIndex = sellerState.books.findIndex(b => b.id === bookId);
+    if (bookIndex !== -1) {
+      sellerState.books[bookIndex].is_out_of_stock = isOutOfStock;
+      sellerState.books[bookIndex].is_visible = !isOutOfStock;
+      if (data.stock !== undefined) sellerState.books[bookIndex].stock = data.stock;
+    }
+
+    // Re-render lại bảng và cập nhật số liệu
+    await loadSellerBooks();
+    await loadSellerDashboard();
+  } catch (e) {
+    showToast('Có lỗi khi cập nhật trạng thái hết hàng. Vui lòng thử lại.', 'error');
+    // Re-render lại để reset toggle
+    filterSellerBooksUI();
+  }
+}
+
+// Hàng loạt: Báo hết hàng hoặc mở bán lại
+async function bulkMarkOutOfStock(isOutOfStock) {
+  const count = sellerState.selectedBookIds.size;
+  if (count === 0) {
+    showToast('Vui lòng chọn ít nhất 1 cuốn sách', 'warning');
+    return;
+  }
+
+  const action = isOutOfStock ? 'đánh dấu HẾT HÀNG và ẨN khỏi sàn' : 'MỞ BÁN LẠI trên sàn';
+  if (!confirm(`Bạn có chắc chắn muốn ${action} cho ${count} cuốn sách đã chọn?`)) return;
+
+  try {
+    const data = await apiCall('/api/seller/books/bulk-toggle-out-of-stock', {
+      method: 'POST',
+      body: JSON.stringify({
+        book_ids: Array.from(sellerState.selectedBookIds),
+        is_out_of_stock: isOutOfStock
+      })
+    });
+    showToast(data.message || `Đã cập nhật ${count} cuốn sách thành công!`, isOutOfStock ? 'warning' : 'success');
+    deselectAllSellerBooks();
+    await loadSellerBooks();
+    await loadSellerDashboard();
+  } catch (e) {
+    showToast('Có lỗi khi cập nhật hàng loạt. Vui lòng thử lại.', 'error');
+  }
 }
 
 // Xóa hàng loạt sách đã chọn

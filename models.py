@@ -183,9 +183,10 @@ class Book(Base):
     sample_content = Column(Text, nullable=True)
     full_ebook_content = Column(Text, nullable=True) # Chỉ VIP mới xem được toàn bộ
     
-    # Trạng thái duyệt của Admin & Quảng cáo của NXB
+    # Trạng thái duyệt của Admin, Tình trạng tồn kho NXB & Quảng cáo của NXB
     status = Column(String(20), default=BookStatus.PENDING.value)
     is_visible = Column(Boolean, default=True, nullable=False)
+    is_out_of_stock = Column(Boolean, default=False, nullable=False)
     rejection_reason = Column(Text, nullable=True)
     rejected_at = Column(DateTime, nullable=True)
     rejected_by = Column(Integer, nullable=True)

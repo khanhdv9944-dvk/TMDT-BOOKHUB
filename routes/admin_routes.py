@@ -244,7 +244,10 @@ def get_pending_books(
             "rating": b.rating,
             "created_at": b.created_at,
             "seller_shop_name": b.seller.shop_name if b.seller else "NXB",
-            "category_name": b.category.name if b.category else "Chưa phân loại"
+            "category_name": b.category.name if b.category else "Chưa phân loại",
+            "is_visible": getattr(b, "is_visible", True),
+            "is_out_of_stock": getattr(b, "is_out_of_stock", False),
+            "rejection_reason": getattr(b, "rejection_reason", None)
         })
     return results
 
@@ -255,7 +258,7 @@ def get_admin_book(book_id: int, db: Session = Depends(get_db), current_user: mo
     if not book:
         raise HTTPException(status_code=404, detail="Không tìm thấy sách")
     return {
-        **{field: getattr(book, field) for field in ["id", "seller_id", "category_id", "title", "author", "publisher", "price", "discount_price", "stock", "cover_image", "description", "book_format", "cover_type", "vip_eligible", "isbn", "translator", "page_count", "publication_year", "language", "preview_file_url", "sample_content", "full_ebook_content", "status", "is_featured_ad", "sold_count", "rating", "created_at", "is_visible", "rejection_reason"]},
+        **{field: getattr(book, field) for field in ["id", "seller_id", "category_id", "title", "author", "publisher", "price", "discount_price", "stock", "cover_image", "description", "book_format", "cover_type", "vip_eligible", "isbn", "translator", "page_count", "publication_year", "language", "preview_file_url", "sample_content", "full_ebook_content", "status", "is_featured_ad", "sold_count", "rating", "created_at", "is_visible", "is_out_of_stock", "rejection_reason"]},
         "seller_shop_name": book.seller.shop_name if book.seller else "NXB",
         "category_name": book.category.name if book.category else "Chưa phân loại",
     }

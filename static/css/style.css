@@ -4356,6 +4356,88 @@ body { background: #f3f4f6; }
   font-weight: 700;
 }
 
+/* ========================================================================== */
+/* OUT OF STOCK (HẾT HÀNG / KHÓA & ẨN SÀN) TOGGLE STYLES                      */
+/* ========================================================================== */
+.seller-book-row.is-out-of-stock {
+  background-color: #fef2f2 !important;
+}
+
+.seller-book-row.is-out-of-stock td:first-child {
+  border-left: 3px solid #ef4444;
+}
+
+.stock-out-switch {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  user-select: none;
+  font-size: 12px;
+}
+
+.stock-out-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+  position: absolute;
+}
+
+.stock-out-slider {
+  position: relative;
+  display: inline-block;
+  width: 40px;
+  height: 22px;
+  background-color: #10b981; /* Green when NOT out of stock (available) */
+  border-radius: 20px;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.15);
+}
+
+.stock-out-slider::before {
+  position: absolute;
+  content: "";
+  height: 16px;
+  width: 16px;
+  left: 3px;
+  bottom: 3px;
+  background-color: white;
+  border-radius: 50%;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+}
+
+/* When checked (Hết hàng = true) -> turns RED and moves thumb */
+.stock-out-switch input:checked + .stock-out-slider {
+  background-color: #ef4444;
+  box-shadow: 0 0 8px rgba(239, 68, 68, 0.35);
+}
+
+.stock-out-switch input:checked + .stock-out-slider::before {
+  transform: translateX(18px);
+}
+
+.stock-out-label-text {
+  font-weight: 700;
+  font-size: 11px;
+  white-space: nowrap;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.stock-out-label-text.in-stock {
+  color: #059669;
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+}
+
+.stock-out-label-text.out-stock {
+  color: #dc2626;
+  background: #fee2e2;
+  border: 1px solid #fca5a5;
+}
+
 /* Order Item expandable details */
 .order-expand-toggle {
   background: none;

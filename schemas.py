@@ -182,6 +182,8 @@ class BookBase(BaseModel):
     preview_file_url: Optional[str] = None
     sample_content: Optional[str] = None
     full_ebook_content: Optional[str] = None
+    is_out_of_stock: Optional[bool] = False
+    is_visible: Optional[bool] = True
 
 class BookCreate(BookBase):
     pass
@@ -207,6 +209,16 @@ class BookUpdate(BaseModel):
     preview_file_url: Optional[str] = None
     sample_content: Optional[str] = None
     full_ebook_content: Optional[str] = None
+    is_out_of_stock: Optional[bool] = None
+    is_visible: Optional[bool] = None
+
+class ToggleOutOfStockRequest(BaseModel):
+    is_out_of_stock: Optional[bool] = None
+    new_stock: Optional[int] = None
+
+class BulkToggleOutOfStockRequest(BaseModel):
+    book_ids: List[int]
+    is_out_of_stock: bool
 
 class BookOut(BookBase):
     id: int
@@ -219,6 +231,7 @@ class BookOut(BookBase):
     seller_shop_name: Optional[str] = None
     category_name: Optional[str] = None
     is_visible: bool = True
+    is_out_of_stock: bool = False
     rejection_reason: Optional[str] = None
 
     class Config:

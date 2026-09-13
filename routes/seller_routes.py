@@ -45,6 +45,10 @@ def get_seller_dashboard(
         models.Book.seller_id == current_user.id,
         models.Book.stock <= 5
     ).count()
+    out_of_stock_books = db.query(models.Book).filter(
+        models.Book.seller_id == current_user.id,
+        (models.Book.is_out_of_stock.is_(True)) | (models.Book.is_visible.is_(False))
+    ).count()
 
     # Đơn hàng mới cần xử lý
     pending_orders_count = sum(1 for o in orders if o.status == models.OrderStatus.PENDING.value)
@@ -112,6 +116,7 @@ def get_seller_dashboard(
         "approved_books": approved_books,
         "pending_books": pending_books,
         "low_stock_books": low_stock_books,
+        "out_of_stock_books": out_of_stock_books,
         "top_books": top_books,
         "chart_data": chart_data
     }
@@ -160,7 +165,10 @@ def get_seller_books(
             "rating": b.rating,
             "created_at": b.created_at,
             "seller_shop_name": current_user.shop_name or current_user.full_name,
-            "category_name": b.category.name if b.category else "Tổng hợp"
+            "category_name": b.category.name if b.category else "Tổng hợp",
+            "is_visible": getattr(b, 'is_visible', True),
+            "is_out_of_stock": getattr(b, 'is_out_of_stock', False),
+            "rejection_reason": getattr(b, 'rejection_reason', None)
         })
     return results
 
@@ -192,7 +200,9 @@ def create_book(
         preview_file_url=book_in.preview_file_url,
         sample_content=book_in.sample_content,
         full_ebook_content=book_in.full_ebook_content,
-        status=models.BookStatus.PENDING.value
+        status=models.BookStatus.PENDING.value,
+        is_visible=True,
+        is_out_of_stock=False
     )
     db.add(new_book)
     db.commit()
@@ -233,7 +243,10 @@ def create_book(
         "rating": new_book.rating,
         "created_at": new_book.created_at,
         "seller_shop_name": current_user.shop_name,
-        "category_name": ""
+        "category_name": "",
+        "is_visible": new_book.is_visible,
+        "is_out_of_stock": new_book.is_out_of_stock,
+        "rejection_reason": None
     }
 
 @router.put("/books/{book_id}")
@@ -251,9 +264,92 @@ def update_book(
     for field, value in update_data.items():
         setattr(book, field, value)
     
+    # Đồng bộ nếu trạng thái hết hàng được cập nhật trực tiếp
+    if "is_out_of_stock" in update_data:
+        if update_data["is_out_of_stock"]:
+            book.is_visible = False
+        elif "is_visible" not in update_data:
+            book.is_visible = True
+    
     db.commit()
     db.refresh(book)
-    return {"message": "Cập nhật thông tin sách thành công", "book_id": book.id}
+    return {
+        "message": "Cập nhật thông tin sách thành công",
+        "book_id": book.id,
+        "is_out_of_stock": getattr(book, "is_out_of_stock", False),
+        "is_visible": getattr(book, "is_visible", True)
+    }
+
+@router.post("/books/{book_id}/toggle-out-of-stock")
+def toggle_book_out_of_stock(
+    book_id: int,
+    payload: Optional[schemas.ToggleOutOfStockRequest] = None,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.require_role([models.UserRole.SELLER.value, models.UserRole.ADMIN.value]))
+):
+    book = db.query(models.Book).filter(models.Book.id == book_id, models.Book.seller_id == current_user.id).first()
+    if not book:
+        raise HTTPException(status_code=404, detail="Không tìm thấy cuốn sách này")
+
+    if payload and payload.is_out_of_stock is not None:
+        new_out_of_stock = payload.is_out_of_stock
+    else:
+        new_out_of_stock = not getattr(book, 'is_out_of_stock', False)
+
+    book.is_out_of_stock = new_out_of_stock
+    if new_out_of_stock:
+        # Tự động khóa và ẩn sản phẩm khỏi sàn
+        book.is_visible = False
+        message = f"Đã đánh dấu hết hàng cuốn '{book.title}'. Sản phẩm đã tự động bị khóa và ẩn khỏi sàn TMĐT."
+    else:
+        # Mở bán lại trên sàn
+        book.is_visible = True
+        if payload and payload.new_stock is not None and payload.new_stock > 0:
+            book.stock = payload.new_stock
+        elif book.stock <= 0:
+            book.stock = 10  # Phục hồi mức tồn kho mặc định
+        message = f"Đã mở bán lại cuốn '{book.title}' trên sàn TMĐT thành công."
+
+    db.commit()
+    db.refresh(book)
+    return {
+        "message": message,
+        "book_id": book.id,
+        "is_out_of_stock": book.is_out_of_stock,
+        "is_visible": book.is_visible,
+        "stock": book.stock
+    }
+
+@router.post("/books/bulk-toggle-out-of-stock")
+def bulk_toggle_out_of_stock(
+    payload: schemas.BulkToggleOutOfStockRequest,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.require_role([models.UserRole.SELLER.value, models.UserRole.ADMIN.value]))
+):
+    if not payload.book_ids:
+        raise HTTPException(status_code=400, detail="Vui lòng chọn ít nhất 1 cuốn sách")
+
+    books = db.query(models.Book).filter(
+        models.Book.id.in_(payload.book_ids),
+        models.Book.seller_id == current_user.id
+    ).all()
+
+    for book in books:
+        book.is_out_of_stock = payload.is_out_of_stock
+        if payload.is_out_of_stock:
+            book.is_visible = False
+        else:
+            book.is_visible = True
+            if book.stock <= 0:
+                book.stock = 10
+
+    db.commit()
+    action_text = "khóa và ẩn khỏi sàn (hết hàng)" if payload.is_out_of_stock else "mở bán lại trên sàn"
+    return {
+        "message": f"Đã {action_text} cho {len(books)} cuốn sách thành công.",
+        "updated_count": len(books),
+        "is_out_of_stock": payload.is_out_of_stock
+    }
 
 @router.delete("/books/{book_id}")
 def delete_book(
@@ -686,6 +782,28 @@ def update_book_quick_stock(
     db.commit()
     db.refresh(book)
     return {"message": "Cập nhật tồn kho thành công", "id": book.id, "stock": book.stock}
+
+@router.put("/books/{book_id}/toggle-out-of-stock")
+def toggle_book_out_of_stock(
+    book_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.require_role([models.UserRole.SELLER.value, models.UserRole.ADMIN.value]))
+):
+    """Đánh dấu sách hết hàng (stock = 0) và tự động khóa mua hoặc mở bán lại."""
+    book = db.query(models.Book).filter(models.Book.id == book_id, models.Book.seller_id == current_user.id).first()
+    if not book:
+        raise HTTPException(status_code=404, detail="Không tìm thấy sách")
+    
+    if book.stock > 0:
+        book.stock = 0
+        db.commit()
+        db.refresh(book)
+        return {"message": f"Đã đánh dấu sách '{book.title}' là HẾT HÀNG và tự động khóa mua trên Marketplace", "id": book.id, "stock": 0, "is_out_of_stock": True}
+    else:
+        book.stock = 10
+        db.commit()
+        db.refresh(book)
+        return {"message": f"Đã mở bán lại cuốn sách '{book.title}' với 10 cuốn tồn kho", "id": book.id, "stock": 10, "is_out_of_stock": False}
 
 @router.post("/orders/bulk-confirm")
 def bulk_confirm_orders(

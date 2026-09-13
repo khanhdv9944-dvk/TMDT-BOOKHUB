@@ -135,6 +135,7 @@ def migrate_schema():
         book_columns = {column["name"] for column in inspect(engine).get_columns("books")}
         book_additions = {
             "is_visible": "BOOLEAN DEFAULT 1 NOT NULL",
+            "is_out_of_stock": "BOOLEAN DEFAULT 0 NOT NULL",
             "rejection_reason": "TEXT",
             "rejected_at": "DATETIME",
             "rejected_by": "INTEGER",

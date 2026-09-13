@@ -91,8 +91,8 @@ def _calculate_order_snapshot(db: Session, user_id: int, items: list[schemas.Car
         book = db.query(models.Book).filter(models.Book.id == item.book_id).first()
         if not book:
             raise HTTPException(status_code=404, detail=f"Sách #{item.book_id} không tồn tại")
-        if book.status != models.BookStatus.APPROVED.value:
-            raise HTTPException(status_code=400, detail=f"Cuốn sách '{book.title}' hiện chưa được mở bán")
+        if book.status != models.BookStatus.APPROVED.value or not getattr(book, 'is_visible', True) or getattr(book, 'is_out_of_stock', False):
+            raise HTTPException(status_code=400, detail=f"Cuốn sách '{book.title}' hiện đã hết hàng hoặc tạm khóa bởi NXB")
         if item.quantity <= 0:
             raise HTTPException(status_code=400, detail=f"Số lượng cho sách '{book.title}' phải lớn hơn 0")
         if book.stock < item.quantity:

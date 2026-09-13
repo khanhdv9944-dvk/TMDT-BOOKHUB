@@ -23,8 +23,9 @@ def list_public_sellers(db: Session = Depends(get_db)):
         "shop_name": seller.shop_name or seller.full_name or seller.username,
         "description": seller.shop_description,
         "logo": seller.shop_logo or seller.avatar,
-        "book_count": sum(1 for book in seller.books if book.status == models.BookStatus.APPROVED.value),
+        "book_count": sum(1 for book in seller.books if book.status == models.BookStatus.APPROVED.value and getattr(book, 'is_visible', True) and not getattr(book, 'is_out_of_stock', False)),
     } for seller in sellers]
+
 @router.get("", response_model=List[schemas.BookOut])
 def list_books(
     q: Optional[str] = Query(None, description="Tìm theo tên sách hoặc tác giả"),
@@ -34,7 +35,11 @@ def list_books(
     limit: int = 50,
     db: Session = Depends(get_db)
 ):
-    query = db.query(models.Book).filter(models.Book.status == models.BookStatus.APPROVED.value)
+    query = db.query(models.Book).filter(
+        models.Book.status == models.BookStatus.APPROVED.value,
+        models.Book.is_visible.is_(True),
+        models.Book.is_out_of_stock.is_(False)
+    )
     
     if q:
         search_pattern = f"%{q}%"
@@ -88,7 +93,10 @@ def list_books(
             "rating": b.rating,
             "created_at": b.created_at,
             "seller_shop_name": b.seller.shop_name if b.seller else "NXB Chính hãng",
-            "category_name": b.category.name if b.category else "Tổng hợp"
+            "category_name": b.category.name if b.category else "Tổng hợp",
+            "is_visible": getattr(b, 'is_visible', True),
+            "is_out_of_stock": getattr(b, 'is_out_of_stock', False),
+            "rejection_reason": getattr(b, 'rejection_reason', None)
         }
         results.append(book_dict)
     return results
@@ -97,7 +105,9 @@ def list_books(
 def get_recommendations(db: Session = Depends(get_db)):
     """Gợi ý sách hợp gu độc giả: kết hợp sách đánh giá cao, bán chạy và tuyển chọn"""
     books = db.query(models.Book).filter(
-        models.Book.status == models.BookStatus.APPROVED.value
+        models.Book.status == models.BookStatus.APPROVED.value,
+        models.Book.is_visible.is_(True),
+        models.Book.is_out_of_stock.is_(False)
     ).order_by(desc(models.Book.rating), desc(models.Book.sold_count)).limit(6).all()
 
     results = []
@@ -125,7 +135,10 @@ def get_recommendations(db: Session = Depends(get_db)):
             "rating": b.rating,
             "created_at": b.created_at,
             "seller_shop_name": b.seller.shop_name if b.seller else "NXB Chính hãng",
-            "category_name": b.category.name if b.category else "Tổng hợp"
+            "category_name": b.category.name if b.category else "Tổng hợp",
+            "is_visible": getattr(b, 'is_visible', True),
+            "is_out_of_stock": getattr(b, 'is_out_of_stock', False),
+            "rejection_reason": getattr(b, 'rejection_reason', None)
         })
     return results
 
@@ -167,6 +180,8 @@ def get_book_detail(
         "sold_count": book.sold_count,
         "rating": book.rating,
         "created_at": book.created_at,
+        "is_visible": getattr(book, 'is_visible', True),
+        "is_out_of_stock": getattr(book, 'is_out_of_stock', False),
         "seller": {
             "id": book.seller.id,
             "shop_name": book.seller.shop_name or book.seller.full_name,
