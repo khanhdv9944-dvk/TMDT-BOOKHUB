@@ -4484,38 +4484,39 @@ async function loadPendingSellers() {
     const sellerBadge = document.getElementById('admin-sellers-badge');
     if (sellerBadge) sellerBadge.textContent = String(sellers.length);
 
-    const container = document.getElementById('admin-pending-sellers-table');
-    if (!container) {
+    const moduleView = document.getElementById('admin-module-view');
+    if (moduleView && moduleView.style.display !== 'none') {
       renderAdminApiTable('Gian hàng & hồ sơ chờ duyệt', 'Kiểm tra thông tin pháp lý trước khi cấp quyền bán hàng.', ['Gian hàng', 'Owner', 'Email', 'Giấy phép', 'Trạng thái'], sellers.map(s => ({ id: s.id, record: s, cells: [s.shop_name || s.full_name, s.full_name, s.email, s.business_license || 'Chưa tải lên', '<span class="admin-status warning">Chờ duyệt</span>'] })), (id, record) => `<button class="admin-row-action" onclick="showAdminSeller('${id}')">Xem chi tiết</button>${record.business_license ? `<button class="admin-row-action" onclick="openAdminDocument('DOC-01')">Xem giấy phép</button>` : ''}<button class="admin-row-action" onclick="confirmAdminAction('Duyệt hồ sơ seller?', () => runAdminAction(this, () => adminService().SellerService.approveSeller('${id}'), 'Đã duyệt seller.').then(() => { loadPendingSellers(); updateAdminSidebarBadges(); }))">Duyệt</button><button class="admin-row-action danger-text" onclick="promptAdminReason('Từ chối hồ sơ seller', reason => runAdminAction(this, () => adminService().SellerService.rejectSeller('${id}', reason), 'Đã từ chối seller.').then(() => { loadPendingSellers(); updateAdminSidebarBadges(); }))">Từ chối</button>`);
-      return;
-    }
-    
-    if (sellers.length === 0) {
-      container.innerHTML = `<tr><td colspan="5" style="text-align:center; padding:20px; color:#94a3b8;">Không có NXB nào đang chờ duyệt</td></tr>`;
-      return;
     }
 
-    let html = '';
-    sellers.forEach(s => {
-      html += `
-        <tr>
-          <td>
-            <b>${s.shop_name || s.full_name}</b>
-            <div style="font-size:11px; color:#64748b;">Username: ${s.username} | SĐT: ${s.phone || 'Chưa có'}</div>
-          </td>
-          <td><span style="font-size:12px; background:#e0e7ff; padding:3px 8px; border-radius:4px;">${s.business_license || 'Chưa nộp GPKD'}</span></td>
-          <td>${s.shop_description || 'Chưa có mô tả'}</td>
-          <td><span class="badge badge-warning">Chờ thẩm định</span></td>
-          <td>
-            <div style="display:flex; gap:6px;">
-              <button class="btn-success" onclick="approveSellerByAdmin(${s.id})">✅ Duyệt Cấp Phép</button>
-              <button class="btn-danger" onclick="rejectSellerByAdmin(${s.id})">❌ Từ Chối</button>
-            </div>
-          </td>
-        </tr>
-      `;
-    });
-    container.innerHTML = html;
+    const container = document.getElementById('admin-pending-sellers-table');
+    if (container) {
+      if (sellers.length === 0) {
+        container.innerHTML = `<tr><td colspan="5" style="text-align:center; padding:20px; color:#94a3b8;">Không có NXB nào đang chờ duyệt</td></tr>`;
+      } else {
+        let html = '';
+        sellers.forEach(s => {
+          html += `
+            <tr>
+              <td>
+                <b>${escapeHtml(s.shop_name || s.full_name)}</b>
+                <div style="font-size:11px; color:#64748b;">Username: ${escapeHtml(s.username)} | SĐT: ${escapeHtml(s.phone || 'Chưa có')}</div>
+              </td>
+              <td><span style="font-size:12px; background:#e0e7ff; padding:3px 8px; border-radius:4px;">${escapeHtml(s.business_license || 'Chưa nộp GPKD')}</span></td>
+              <td>${escapeHtml(s.shop_description || 'Chưa có mô tả')}</td>
+              <td><span class="badge badge-warning">Chờ thẩm định</span></td>
+              <td>
+                <div style="display:flex; gap:6px;">
+                  <button class="btn-success" onclick="approveSellerByAdmin(${s.id})">✅ Duyệt Cấp Phép</button>
+                  <button class="btn-danger" onclick="rejectSellerByAdmin(${s.id})">❌ Từ Chối</button>
+                </div>
+              </td>
+            </tr>
+          `;
+        });
+        container.innerHTML = html;
+      }
+    }
   } catch (e) {}
 }
 
@@ -4531,69 +4532,68 @@ async function loadPendingBooks() {
   try {
     const books = await apiCall('/api/admin/books/pending');
 
-    // FIX: Luôn cập nhật badge ngay khi có kết quả từ API
+    // Luôn cập nhật badge số lượng sách chờ duyệt
     const prodBadge = document.getElementById('admin-products-badge');
     if (prodBadge) prodBadge.textContent = String(books.length);
 
-    // Kiểm tra container trong HTML tĩnh
-    const container = document.getElementById('admin-pending-books-table');
-
-    // Nếu container không tồn tại (admin-module-view đã bị thay thế bởi renderAdminApiTable),
-    // render lại toàn bộ bảng dạng generic API table
-    if (!container) {
+    // 1. Nếu đang hiển thị Admin Module View (Admin bấm vào tab "Sản phẩm" ở sidebar),
+    // render trực tiếp danh sách sách chờ duyệt vào admin-module-view
+    const moduleView = document.getElementById('admin-module-view');
+    if (moduleView && moduleView.style.display !== 'none') {
       renderAdminApiTable(
         'Sản phẩm & duyệt sách',
-        'Thẩm định nội dung và thông tin sách trước khi xuất hiện trên marketplace.',
+        'Thẩm định nội dung và thông tin sách do NXB gửi duyệt trước khi xuất hiện trên marketplace.',
         ['Sản phẩm', 'ISBN', 'Seller / NXB', 'Giá', 'Tồn kho', 'Trạng thái'],
         books.map(b => ({ id: b.id, record: b, cells: [
-          `<b>${b.title}</b><small>${b.author}</small>`,
+          `<b>${escapeHtml(b.title)}</b><small>${escapeHtml(b.author)}</small>`,
           b.isbn || 'Chưa có',
-          b.seller_shop_name,
+          escapeHtml(b.seller_shop_name || 'NXB'),
           formatVND(b.discount_price || b.price),
           b.stock,
           '<span class="admin-status warning">Chờ duyệt</span>'
         ]})),
         (id, record) => `<button class="admin-row-action" onclick="showAdminProduct('${id}')">Xem</button><button class="admin-row-action" onclick="confirmAdminAction('Duyệt sản phẩm?', () => runAdminAction(this, () => adminService().ProductService.approveProduct('${id}'), 'Đã duyệt sản phẩm.').then(() => { loadPendingBooks(); updateAdminSidebarBadges(); }))">Duyệt</button><button class="admin-row-action danger-text" onclick="promptAdminReason('Từ chối sản phẩm', reason => runAdminAction(this, () => adminService().ProductService.rejectProduct('${id}', reason), 'Đã từ chối sản phẩm.').then(() => { loadPendingBooks(); updateAdminSidebarBadges(); }))">Từ chối</button>`
       );
-      return;
     }
 
-    // Container tồn tại trong HTML tĩnh: render vào tbody
-    if (books.length === 0) {
-      container.innerHTML = `<tr><td colspan="5" style="text-align:center; padding:20px; color:#94a3b8;">Hiện không có cuốn sách nào chờ duyệt ✅</td></tr>`;
-      return;
+    // 2. Nếu container admin-pending-books-table trong HTML tĩnh có sẵn (Dashboard view), render vào tbody
+    const container = document.getElementById('admin-pending-books-table');
+    if (container) {
+      if (books.length === 0) {
+        container.innerHTML = `<tr><td colspan="5" style="text-align:center; padding:20px; color:#94a3b8;">Hiện không có cuốn sách nào chờ duyệt ✅</td></tr>`;
+      } else {
+        let html = '';
+        books.forEach(b => {
+          const isbn = b.isbn || '<span style="color:#94a3b8;font-style:italic;">Chưa có ISBN</span>';
+          html += `
+            <tr>
+              <td>
+                <div style="display:flex; align-items:center; gap:8px;">
+                  <img src="${b.cover_image}" style="width:36px; height:48px; object-fit:cover; border-radius:4px;" onerror="this.src='https://images.unsplash.com/photo-1544947950-fa07a98d237f?auto=format&fit=crop&q=80&w=400'">
+                  <div>
+                    <b>${escapeHtml(b.title)}</b>
+                    <div style="font-size:11px; color:#64748b;">Tác giả: ${escapeHtml(b.author)}</div>
+                    <div style="font-size:10px; color:#94a3b8;">ISBN: ${isbn}</div>
+                  </div>
+                </div>
+              </td>
+              <td>${escapeHtml(b.seller_shop_name || 'NXB')}</td>
+              <td><b>${formatVND(b.discount_price || b.price)}</b><br><small style="color:#64748b;">Kho: ${b.stock}</small></td>
+              <td>
+                <button class="btn-preview" style="padding:3px 8px; font-size:11px;" onclick="openBookReaderModal(${b.id})">📖 Đọc thử thẩm định</button>
+              </td>
+              <td>
+                <div style="display:flex; gap:6px; flex-wrap:wrap;">
+                  <button class="btn-success" style="font-size:12px;" onclick="approveBookByAdmin(${b.id})">✅ Duyệt Lên Sàn</button>
+                  <button class="btn-danger" style="font-size:12px;" onclick="rejectBookByAdmin(${b.id})">❌ Từ Chối</button>
+                </div>
+              </td>
+            </tr>
+          `;
+        });
+        container.innerHTML = html;
+      }
     }
-
-    let html = '';
-    books.forEach(b => {
-      const isbn = b.isbn || '<span style="color:#94a3b8;font-style:italic;">Chưa có ISBN</span>';
-      html += `
-        <tr>
-          <td>
-            <div style="display:flex; align-items:center; gap:8px;">
-              <img src="${b.cover_image}" style="width:36px; height:48px; object-fit:cover; border-radius:4px;" onerror="this.src='https://images.unsplash.com/photo-1544947950-fa07a98d237f?auto=format&fit=crop&q=80&w=400'">
-              <div>
-                <b>${escapeHtml(b.title)}</b>
-                <div style="font-size:11px; color:#64748b;">Tác giả: ${escapeHtml(b.author)}</div>
-                <div style="font-size:10px; color:#94a3b8;">ISBN: ${isbn}</div>
-              </div>
-            </div>
-          </td>
-          <td>${escapeHtml(b.seller_shop_name || 'NXB')}</td>
-          <td><b>${formatVND(b.discount_price || b.price)}</b><br><small style="color:#64748b;">Kho: ${b.stock}</small></td>
-          <td>
-            <button class="btn-preview" style="padding:3px 8px; font-size:11px;" onclick="openBookReaderModal(${b.id})">📖 Đọc thử thẩm định</button>
-          </td>
-          <td>
-            <div style="display:flex; gap:6px; flex-wrap:wrap;">
-              <button class="btn-success" style="font-size:12px;" onclick="approveBookByAdmin(${b.id})">✅ Duyệt Lên Sàn</button>
-              <button class="btn-danger" style="font-size:12px;" onclick="rejectBookByAdmin(${b.id})">❌ Từ Chối</button>
-            </div>
-          </td>
-        </tr>
-      `;
-    });
-    container.innerHTML = html;
   } catch (e) {
     console.error('[loadPendingBooks] Lỗi khi tải danh sách sách chờ duyệt:', e);
   }
