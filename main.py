@@ -4,7 +4,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
-from database import engine, Base, migrate_schema
+from database import engine, Base, migrate_schema, migrate_sqlite_data_to_postgres
 from routes.auth_routes import router as auth_router
 from routes.books_routes import router as books_router
 from routes.orders_routes import router as orders_router
@@ -28,12 +28,13 @@ def initialize_database():
         return
     try:
         Base.metadata.create_all(bind=engine)
+        migrate_sqlite_data_to_postgres(Base.metadata)
         migrate_schema()
         seed_database()
         _db_initialized = True
     except Exception as e:
         print(f"Database initialization error: {e}")
-        _db_initialized = True  # Đánh dấu đã try, tránh loop
+        raise
 
 # Khởi tạo DB ngay trên startup
 initialize_database()

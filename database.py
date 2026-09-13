@@ -1,23 +1,34 @@
 import os
 import shutil
 from pathlib import Path
-from sqlalchemy import create_engine, inspect, text
+from sqlalchemy import MetaData, create_engine, inspect, select, text
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
 BASE_DIR = Path(__file__).resolve().parent
 SOURCE_DB_PATH = BASE_DIR / "bookhub.db"
-if os.getenv("VERCEL"):
+DATABASE_URL = os.getenv("DATABASE_URL")
+
+if DATABASE_URL:
+    # Vercel/Neon may expose the URL with the legacy postgres:// scheme.
+    SQLALCHEMY_DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql+psycopg2://", 1)
+    DB_PATH = None
+elif os.getenv("VERCEL"):
     DB_PATH = Path("/tmp/bookhub.db")
     if not DB_PATH.exists() and SOURCE_DB_PATH.exists():
         shutil.copy2(SOURCE_DB_PATH, DB_PATH)
+    SQLALCHEMY_DATABASE_URL = f"sqlite:///{DB_PATH}"
 else:
     DB_PATH = SOURCE_DB_PATH
-SQLALCHEMY_DATABASE_URL = f"sqlite:///{DB_PATH}"
+    SQLALCHEMY_DATABASE_URL = f"sqlite:///{DB_PATH}"
 
-engine = create_engine(
-    SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False}
-)
+engine_options = {}
+if SQLALCHEMY_DATABASE_URL.startswith("sqlite"):
+    engine_options["connect_args"] = {"check_same_thread": False}
+else:
+    engine_options["pool_pre_ping"] = True
+
+engine = create_engine(SQLALCHEMY_DATABASE_URL, **engine_options)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 Base = declarative_base()
@@ -28,6 +39,52 @@ def get_db():
         yield db
     finally:
         db.close()
+
+def migrate_sqlite_data_to_postgres(metadata):
+    """Copy the tracked legacy SQLite data into a newly provisioned Postgres database once."""
+    if not DATABASE_URL or not SOURCE_DB_PATH.exists():
+        return
+
+    inspector = inspect(engine)
+    if "users" not in inspector.get_table_names():
+        return
+    with engine.connect() as connection:
+        has_data = connection.execute(text("SELECT EXISTS (SELECT 1 FROM users LIMIT 1)")).scalar()
+    if has_data:
+        return
+
+    source_engine = create_engine(f"sqlite:///{SOURCE_DB_PATH}")
+    source_metadata = MetaData()
+    source_metadata.reflect(bind=source_engine)
+    target_tables = {table.name: table for table in metadata.sorted_tables}
+
+    with source_engine.connect() as source_connection, engine.begin() as target_connection:
+        for table_name, target_table in target_tables.items():
+            source_table = source_metadata.tables.get(table_name)
+            if source_table is None:
+                continue
+            source_rows = source_connection.execute(select(source_table)).mappings().all()
+            if not source_rows:
+                continue
+            target_columns = {column.name for column in target_table.columns}
+            rows = [
+                {column: value for column, value in row.items() if column in target_columns}
+                for row in source_rows
+            ]
+            target_connection.execute(target_table.insert(), rows)
+
+        for table_name, target_table in target_tables.items():
+            if "id" not in target_table.columns:
+                continue
+            sequence_name = target_connection.execute(text(
+                "SELECT pg_get_serial_sequence(:table_name, 'id')"
+            ), {"table_name": f'public.{table_name}'}).scalar()
+            if sequence_name:
+                target_connection.execute(text(
+                    "SELECT setval(:sequence_name, "
+                    "COALESCE((SELECT MAX(id) FROM \"" + table_name + "\"), 1), "
+                    "(SELECT MAX(id) IS NOT NULL FROM \"" + table_name + "\"))"
+                ), {"sequence_name": sequence_name})
 
 def migrate_schema():
     """Apply the small additive migration needed by the existing SQLite database."""
