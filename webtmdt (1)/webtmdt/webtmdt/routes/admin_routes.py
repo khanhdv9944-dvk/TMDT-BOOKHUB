@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func, desc
 from database import get_db
 import models, schemas, auth
+import notification_service
 from financial import COMMISSION_RATE_PERCENT, calculate_commission, order_net_gmv
 
 router = APIRouter(prefix="/api/admin", tags=["Admin Portal"])
@@ -36,6 +37,11 @@ def get_platform_financial_overview(
     total_gmv = sum(order_values)
     total_commission_earned = sum(calculate_commission(value) for value in order_values)
     total_orders = sum(1 for value in order_values if value > 0)
+    successful_orders = sum(1 for order, value in zip(orders, order_values) if order.status == models.OrderStatus.DELIVERED.value and value > 0)
+    cancelled_orders = sum(1 for order in orders if str(order.status).upper() in {"CANCELLED", "CANCELED"})
+    refunded_orders = sum(1 for order in orders if refunded_by_order.get(order.id, 0.0) > 0)
+    returned_orders = db.query(models.Order).filter(models.Order.return_status != "NONE").count()
+    total_refunds = sum(refunded_by_order.values())
 
     # 2. Doanh thu từ Quảng Cáo vị trí nổi bật (Ads Revenue)
     total_ad_revenue = db.query(func.sum(models.AdCampaign.fee_paid)).scalar() or 0.0
@@ -45,6 +51,7 @@ def get_platform_financial_overview(
     total_vip_revenue = db.query(func.sum(models.VipSubscription.price)).scalar() or 0.0
     total_vip_members = db.query(models.VipSubscription).count()
 
+    # This metric is intentionally commission-only. Ads and VIP are separate streams.
     total_platform_revenue = total_commission_earned
 
     # Thống kê tổng số lượng thực thể
@@ -97,6 +104,11 @@ def get_platform_financial_overview(
         },
         "stats": {
             "total_orders": total_orders,
+            "successful_orders": successful_orders,
+            "cancelled_orders": cancelled_orders,
+            "returned_orders": returned_orders,
+            "refunded_orders": refunded_orders,
+            "total_refunds": total_refunds,
             "total_users": total_users,
             "total_sellers": total_sellers,
             "pending_sellers": pending_sellers,
@@ -239,15 +251,27 @@ def get_pending_books(
             "stock": b.stock,
             "cover_image": b.cover_image,
             "description": b.description,
+            "book_format": b.book_format or "PAPER",
+            "cover_type": b.cover_type or "SOFT",
+            "vip_eligible": b.vip_eligible or False,
+            "isbn": b.isbn,
+            "translator": b.translator,
+            "page_count": b.page_count,
+            "publication_year": b.publication_year,
+            "language": b.language or "Tiếng Việt",
+            "preview_file_url": b.preview_file_url,
             "sample_content": b.sample_content,
             "full_ebook_content": b.full_ebook_content,
             "status": b.status,
-            "is_featured_ad": b.is_featured_ad,
-            "sold_count": b.sold_count,
-            "rating": b.rating,
+            "is_featured_ad": b.is_featured_ad or False,
+            "sold_count": b.sold_count or 0,
+            "rating": b.rating or 5.0,
             "created_at": b.created_at,
-            "seller_shop_name": b.seller.shop_name if b.seller else "NXB",
-            "category_name": b.category.name if b.category else "Chưa phân loại"
+            "seller_shop_name": b.seller.shop_name if b.seller and b.seller.shop_name else (b.seller.full_name if b.seller else "NXB"),
+            "category_name": b.category.name if b.category else "Chưa phân loại",
+            "is_visible": getattr(b, "is_visible", True),
+            "is_out_of_stock": getattr(b, "is_out_of_stock", False),
+            "rejection_reason": getattr(b, "rejection_reason", None)
         })
     return results
 
@@ -258,7 +282,7 @@ def get_admin_book(book_id: int, db: Session = Depends(get_db), current_user: mo
     if not book:
         raise HTTPException(status_code=404, detail="Không tìm thấy sách")
     return {
-        **{field: getattr(book, field) for field in ["id", "seller_id", "category_id", "title", "author", "publisher", "price", "discount_price", "stock", "cover_image", "description", "book_format", "cover_type", "vip_eligible", "isbn", "translator", "page_count", "publication_year", "language", "preview_file_url", "sample_content", "full_ebook_content", "status", "is_featured_ad", "sold_count", "rating", "created_at", "is_visible", "rejection_reason"]},
+        **{field: getattr(book, field) for field in ["id", "seller_id", "category_id", "title", "author", "publisher", "price", "discount_price", "stock", "cover_image", "description", "book_format", "cover_type", "vip_eligible", "isbn", "translator", "page_count", "publication_year", "language", "preview_file_url", "sample_content", "full_ebook_content", "status", "is_featured_ad", "sold_count", "rating", "created_at", "is_visible", "is_out_of_stock", "rejection_reason"]},
         "seller_shop_name": book.seller.shop_name if book.seller else "NXB",
         "category_name": book.category.name if book.category else "Chưa phân loại",
     }
@@ -279,6 +303,14 @@ def approve_book(
     book.rejected_at = None
     book.rejected_by = None
     db.commit()
+    db.refresh(book)
+
+    # Luồng 2 (Admin -> NXB): Gửi thông báo tới NXB
+    try:
+        notification_service.notify_seller_book_approved(db=db, book=book)
+    except Exception as e:
+        print(f"[NOTIFICATION ERROR] Không thể gửi thông báo phê duyệt tới NXB: {e}")
+
     return {"message": f"Đã duyệt cho phép cuốn '{book.title}' mở bán trên trang chủ!"}
 
 @router.post("/books/{book_id}/reject")
@@ -298,6 +330,15 @@ def reject_book(
     book.rejected_at = datetime.utcnow()
     book.rejected_by = current_user.id
     db.commit()
+    db.refresh(book)
+
+    # Luồng 2 (Admin -> NXB): Gửi thông báo từ chối tới NXB
+    rejection_reason_str = reason.reason if reason else None
+    try:
+        notification_service.notify_seller_book_rejected(db=db, book=book, reason=rejection_reason_str)
+    except Exception as e:
+        print(f"[NOTIFICATION ERROR] Không thể gửi thông báo từ chối tới NXB: {e}")
+
     return {"message": f"Đã từ chối cuốn '{book.title}'"}
 
 

@@ -581,6 +581,8 @@ function switchPortal(portal) {
     loadSellerDashboard();
   } else if (portal === 'ADMIN') {
     adminPortal.style.display = 'block';
+    // FIX: Cập nhật badge ngay khi vào admin portal (không chờ loadAdminDashboard)
+    updateAdminSidebarBadges();
     const adminRoute = window.location.pathname.match(/^\/admin(?:\/([A-Za-z0-9_-]+))?(?:\/([A-Za-z0-9_-]+))?$/);
     if (adminRoute?.[1] === 'settings' && adminRoute?.[2] === 'permissions') switchAdminView('permissions');
     else if (adminRoute?.[2] && ['disputes', 'payouts'].includes(adminRoute[1])) renderAdminDetail(adminRoute[1], adminRoute[2]);
@@ -4049,6 +4051,25 @@ async function submitBuyAd() {
 // -------------------------------------------------------------
 // CÁNH CỬA 3: ADMIN CHỦ SÀN (ADMIN PORTAL)
 // -------------------------------------------------------------
+async function updateAdminSidebarBadges() {
+  if (!state.currentUser || (state.currentUser.role !== 'ADMIN' && state.currentPortal !== 'ADMIN')) return;
+  try {
+    const overview = await apiCall('/api/admin/financial-overview');
+    const stats = overview.stats;
+    const orderCounts = stats.order_status_counts || {};
+    const pendingOrderCount = Number(orderCounts.PENDING || 0);
+    const setAdminCount = (id, value) => { const element = document.getElementById(id); if (element) element.textContent = String(value ?? 0); };
+    setAdminCount('admin-orders-badge', pendingOrderCount);
+    setAdminCount('admin-disputes-badge', stats.pending_disputes || 0);
+    setAdminCount('admin-products-badge', stats.pending_books || 0);
+    setAdminCount('admin-sellers-badge', stats.pending_sellers || 0);
+    setAdminCount('admin-payouts-badge', stats.pending_payouts || 0);
+    setAdminCount('admin-payouts-menu-badge', stats.pending_payouts || 0);
+    setAdminCount('admin-returns-badge', stats.pending_returns || 0);
+    setAdminCount('admin-notification-count', pendingOrderCount + Number(stats.pending_disputes || 0) + Number(stats.pending_sellers || 0) + Number(stats.pending_books || 0) + Number(stats.pending_payouts || 0) + Number(stats.pending_returns || 0));
+  } catch (e) {}
+}
+
 async function loadAdminDashboard() {
   try {
     const overview = await apiCall('/api/admin/financial-overview');
@@ -4099,6 +4120,8 @@ const adminMockService = { modules: {
 
 function switchAdminView(view, button) {
   if (state.currentPortal !== 'ADMIN') return;
+  state.currentAdminView = view;
+  updateAdminSidebarBadges();
   const adminPath = view === 'dashboard' ? '/admin' : view === 'permissions' ? '/admin/settings/permissions' : `/admin/${view}`;
   if (window.location.pathname !== adminPath) history.pushState({ adminView: view }, '', adminPath);
   document.querySelectorAll('.admin-nav-item').forEach(item => item.classList.toggle('active', button ? item === button : item.dataset.adminView === view && !item.classList.contains('admin-nav-subitem')));
@@ -4458,9 +4481,12 @@ function renderAdminEntityDetail(type, id) {
 async function loadPendingSellers() {
   try {
     const sellers = await apiCall('/api/admin/sellers/pending');
+    const sellerBadge = document.getElementById('admin-sellers-badge');
+    if (sellerBadge) sellerBadge.textContent = String(sellers.length);
+
     const container = document.getElementById('admin-pending-sellers-table');
     if (!container) {
-      renderAdminApiTable('Gian hàng & hồ sơ chờ duyệt', 'Kiểm tra thông tin pháp lý trước khi cấp quyền bán hàng.', ['Gian hàng', 'Owner', 'Email', 'Giấy phép', 'Trạng thái'], sellers.map(s => ({ id: s.id, record: s, cells: [s.shop_name || s.full_name, s.full_name, s.email, s.business_license || 'Chưa tải lên', '<span class="admin-status warning">Chờ duyệt</span>'] })), (id, record) => `<button class="admin-row-action" onclick="showAdminSeller('${id}')">Xem chi tiết</button>${record.business_license ? `<button class="admin-row-action" onclick="openAdminDocument('DOC-01')">Xem giấy phép</button>` : ''}<button class="admin-row-action" onclick="confirmAdminAction('Duyệt hồ sơ seller?', () => runAdminAction(this, () => adminService().SellerService.approveSeller('${id}'), 'Đã duyệt seller.').then(() => loadPendingSellers()))">Duyệt</button><button class="admin-row-action danger-text" onclick="promptAdminReason('Từ chối hồ sơ seller', reason => runAdminAction(this, () => adminService().SellerService.rejectSeller('${id}', reason), 'Đã từ chối seller.').then(() => loadPendingSellers()))">Từ chối</button>`);
+      renderAdminApiTable('Gian hàng & hồ sơ chờ duyệt', 'Kiểm tra thông tin pháp lý trước khi cấp quyền bán hàng.', ['Gian hàng', 'Owner', 'Email', 'Giấy phép', 'Trạng thái'], sellers.map(s => ({ id: s.id, record: s, cells: [s.shop_name || s.full_name, s.full_name, s.email, s.business_license || 'Chưa tải lên', '<span class="admin-status warning">Chờ duyệt</span>'] })), (id, record) => `<button class="admin-row-action" onclick="showAdminSeller('${id}')">Xem chi tiết</button>${record.business_license ? `<button class="admin-row-action" onclick="openAdminDocument('DOC-01')">Xem giấy phép</button>` : ''}<button class="admin-row-action" onclick="confirmAdminAction('Duyệt hồ sơ seller?', () => runAdminAction(this, () => adminService().SellerService.approveSeller('${id}'), 'Đã duyệt seller.').then(() => { loadPendingSellers(); updateAdminSidebarBadges(); }))">Duyệt</button><button class="admin-row-action danger-text" onclick="promptAdminReason('Từ chối hồ sơ seller', reason => runAdminAction(this, () => adminService().SellerService.rejectSeller('${id}', reason), 'Đã từ chối seller.').then(() => { loadPendingSellers(); updateAdminSidebarBadges(); }))">Từ chối</button>`);
       return;
     }
     
@@ -4494,64 +4520,91 @@ async function loadPendingSellers() {
 }
 
 async function approveSellerByAdmin(sellerId) {
-  confirmAdminAction('Duyệt hồ sơ seller?', () => runAdminAction(document.activeElement, () => adminService().SellerService.approveSeller(sellerId), 'Đã duyệt seller.').then(() => loadPendingSellers()));
+  confirmAdminAction('Duyệt hồ sơ seller?', () => runAdminAction(document.activeElement, () => adminService().SellerService.approveSeller(sellerId), 'Đã duyệt seller.').then(() => { loadPendingSellers(); updateAdminSidebarBadges(); }));
 }
 
 async function rejectSellerByAdmin(sellerId) {
-  promptAdminReason('Từ chối hồ sơ seller', reason => runAdminAction(document.activeElement, () => adminService().SellerService.rejectSeller(sellerId, reason), 'Đã từ chối seller.').then(() => loadPendingSellers()));
+  promptAdminReason('Từ chối hồ sơ seller', reason => runAdminAction(document.activeElement, () => adminService().SellerService.rejectSeller(sellerId, reason), 'Đã từ chối seller.').then(() => { loadPendingSellers(); updateAdminSidebarBadges(); }));
 }
 
 async function loadPendingBooks() {
   try {
     const books = await apiCall('/api/admin/books/pending');
+
+    // FIX: Luôn cập nhật badge ngay khi có kết quả từ API
+    const prodBadge = document.getElementById('admin-products-badge');
+    if (prodBadge) prodBadge.textContent = String(books.length);
+
+    // Kiểm tra container trong HTML tĩnh
     const container = document.getElementById('admin-pending-books-table');
+
+    // Nếu container không tồn tại (admin-module-view đã bị thay thế bởi renderAdminApiTable),
+    // render lại toàn bộ bảng dạng generic API table
     if (!container) {
-      renderAdminApiTable('Sản phẩm & duyệt sách', 'Thẩm định nội dung và thông tin sách trước khi xuất hiện trên marketplace.', ['Sản phẩm', 'ISBN', 'Seller / NXB', 'Giá', 'Tồn kho', 'Trạng thái'], books.map(b => ({ id: b.id, record: b, cells: [`<b>${b.title}</b><small>${b.author}</small>`, b.isbn || 'Chưa có', b.seller_shop_name, formatVND(b.discount_price || b.price), b.stock, '<span class="admin-status warning">Chờ duyệt</span>'] })), (id, record) => `<button class="admin-row-action" onclick="showAdminProduct('${id}')">Xem</button><button class="admin-row-action" onclick="confirmAdminAction('Duyệt sản phẩm?', () => runAdminAction(this, () => adminService().ProductService.approveProduct('${id}'), 'Đã duyệt sản phẩm.').then(() => loadPendingBooks()))">Duyệt</button><button class="admin-row-action danger-text" onclick="promptAdminReason('Từ chối sản phẩm', reason => runAdminAction(this, () => adminService().ProductService.rejectProduct('${id}', reason), 'Đã từ chối sản phẩm.').then(() => loadPendingBooks()))">Từ chối</button>`);
+      renderAdminApiTable(
+        'Sản phẩm & duyệt sách',
+        'Thẩm định nội dung và thông tin sách trước khi xuất hiện trên marketplace.',
+        ['Sản phẩm', 'ISBN', 'Seller / NXB', 'Giá', 'Tồn kho', 'Trạng thái'],
+        books.map(b => ({ id: b.id, record: b, cells: [
+          `<b>${b.title}</b><small>${b.author}</small>`,
+          b.isbn || 'Chưa có',
+          b.seller_shop_name,
+          formatVND(b.discount_price || b.price),
+          b.stock,
+          '<span class="admin-status warning">Chờ duyệt</span>'
+        ]})),
+        (id, record) => `<button class="admin-row-action" onclick="showAdminProduct('${id}')">Xem</button><button class="admin-row-action" onclick="confirmAdminAction('Duyệt sản phẩm?', () => runAdminAction(this, () => adminService().ProductService.approveProduct('${id}'), 'Đã duyệt sản phẩm.').then(() => { loadPendingBooks(); updateAdminSidebarBadges(); }))">Duyệt</button><button class="admin-row-action danger-text" onclick="promptAdminReason('Từ chối sản phẩm', reason => runAdminAction(this, () => adminService().ProductService.rejectProduct('${id}', reason), 'Đã từ chối sản phẩm.').then(() => { loadPendingBooks(); updateAdminSidebarBadges(); }))">Từ chối</button>`
+      );
       return;
     }
 
+    // Container tồn tại trong HTML tĩnh: render vào tbody
     if (books.length === 0) {
-      container.innerHTML = `<tr><td colspan="5" style="text-align:center; padding:20px; color:#94a3b8;">Hiện không có cuốn sách nào chờ duyệt</td></tr>`;
+      container.innerHTML = `<tr><td colspan="5" style="text-align:center; padding:20px; color:#94a3b8;">Hiện không có cuốn sách nào chờ duyệt ✅</td></tr>`;
       return;
     }
 
     let html = '';
     books.forEach(b => {
+      const isbn = b.isbn || '<span style="color:#94a3b8;font-style:italic;">Chưa có ISBN</span>';
       html += `
         <tr>
           <td>
             <div style="display:flex; align-items:center; gap:8px;">
-              <img src="${b.cover_image}" style="width:36px; height:48px; object-fit:cover; border-radius:4px;">
+              <img src="${b.cover_image}" style="width:36px; height:48px; object-fit:cover; border-radius:4px;" onerror="this.src='https://images.unsplash.com/photo-1544947950-fa07a98d237f?auto=format&fit=crop&q=80&w=400'">
               <div>
-                <b>${b.title}</b>
-                <div style="font-size:11px; color:#64748b;">Tác giả: ${b.author}</div>
+                <b>${escapeHtml(b.title)}</b>
+                <div style="font-size:11px; color:#64748b;">Tác giả: ${escapeHtml(b.author)}</div>
+                <div style="font-size:10px; color:#94a3b8;">ISBN: ${isbn}</div>
               </div>
             </div>
           </td>
-          <td>${b.seller_shop_name}</td>
-          <td><b>${formatVND(b.discount_price || b.price)}</b> (Kho: ${b.stock})</td>
+          <td>${escapeHtml(b.seller_shop_name || 'NXB')}</td>
+          <td><b>${formatVND(b.discount_price || b.price)}</b><br><small style="color:#64748b;">Kho: ${b.stock}</small></td>
           <td>
             <button class="btn-preview" style="padding:3px 8px; font-size:11px;" onclick="openBookReaderModal(${b.id})">📖 Đọc thử thẩm định</button>
           </td>
           <td>
-            <div style="display:flex; gap:6px;">
-              <button class="btn-success" onclick="approveBookByAdmin(${b.id})">✅ Duyệt Lên Sàn</button>
-              <button class="btn-danger" onclick="rejectBookByAdmin(${b.id})">❌ Từ Chối</button>
+            <div style="display:flex; gap:6px; flex-wrap:wrap;">
+              <button class="btn-success" style="font-size:12px;" onclick="approveBookByAdmin(${b.id})">✅ Duyệt Lên Sàn</button>
+              <button class="btn-danger" style="font-size:12px;" onclick="rejectBookByAdmin(${b.id})">❌ Từ Chối</button>
             </div>
           </td>
         </tr>
       `;
     });
     container.innerHTML = html;
-  } catch (e) {}
+  } catch (e) {
+    console.error('[loadPendingBooks] Lỗi khi tải danh sách sách chờ duyệt:', e);
+  }
 }
 
 async function approveBookByAdmin(bookId) {
-  confirmAdminAction('Duyệt sản phẩm?', () => runAdminAction(document.activeElement, () => adminService().ProductService.approveProduct(bookId), 'Đã duyệt sản phẩm.').then(() => loadPendingBooks()));
+  confirmAdminAction('Duyệt sản phẩm?', () => runAdminAction(document.activeElement, () => adminService().ProductService.approveProduct(bookId), 'Đã duyệt sản phẩm.').then(() => { loadPendingBooks(); updateAdminSidebarBadges(); }));
 }
 
 async function rejectBookByAdmin(bookId) {
-  promptAdminReason('Từ chối sản phẩm', reason => runAdminAction(document.activeElement, () => adminService().ProductService.rejectProduct(bookId, reason), 'Đã từ chối sản phẩm.').then(() => loadPendingBooks()));
+  promptAdminReason('Từ chối sản phẩm', reason => runAdminAction(document.activeElement, () => adminService().ProductService.rejectProduct(bookId, reason), 'Đã từ chối sản phẩm.').then(() => { loadPendingBooks(); updateAdminSidebarBadges(); }));
 }
 
 async function loadAllUsersAdmin() {
@@ -5872,6 +5925,18 @@ async function fetchAndUpdateNotifications() {
     if (notifState.dropdownOpen) {
       renderNotifList(notifState.dropdownOpen);
     }
+
+    // Nếu đang ở Portal Admin: đồng bộ sidebar badges và tự động refresh danh sách chờ duyệt
+    if (state.currentPortal === 'ADMIN' || state.currentUser?.role === 'ADMIN') {
+      updateAdminSidebarBadges();
+      const currentView = state.currentAdminView || (window.location.pathname.match(/^\/admin\/([A-Za-z0-9_-]+)/)?.[1]);
+      // FIX: Khi admin đang xem trang 'products', luôn gọi loadPendingBooks() để refresh bảng.
+      // Trước đây: check if (!container) là sai vì container luôn tồn tại trong HTML tĩnh
+      // nên không bao giờ auto-refresh được danh sách sách chờ duyệt.
+      if (currentView === 'products' && document.getElementById('admin-module-view')?.style.display !== 'none') {
+        loadPendingBooks();
+      }
+    }
   } catch (e) {
     // Silently fail - notifications are non-critical
   }
@@ -6210,11 +6275,11 @@ function escapeHtml(str) {
   return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
-/** Bắt đầu auto-polling thông báo mỗi 30 giây */
+/** Bắt đầu auto-polling thông báo mỗi 6 giây */
 function startNotifPolling() {
   stopNotifPolling();
   fetchAndUpdateNotifications(); // Lấy ngay lần đầu
-  notifState.pollingInterval = setInterval(fetchAndUpdateNotifications, 30000);
+  notifState.pollingInterval = setInterval(fetchAndUpdateNotifications, 6000);
 }
 
 /** Dừng polling */
