@@ -4036,17 +4036,7 @@ function renderAdminApiTable(title, description, columns, rows, actionBuilder) {
   function openAdminOrder(id) { history.pushState({ adminDetail: true }, '', `/admin/orders/${encodeURIComponent(id)}`); renderAdminOrderDetail(id); }
   function renderAdminOrderDetail(id) { const record = adminMockService.modules.orders.rows.find(row => row[0] === id); const root = document.getElementById('admin-module-view'); document.getElementById('admin-dashboard-view').style.display = 'none'; root.style.display = 'block'; if (!record) { root.innerHTML = adminModuleHeading('ORDER DETAIL', 'Không tìm thấy dữ liệu', `Không tìm thấy đơn hàng ${id}.`) + '<button class="admin-button secondary" onclick="history.back()">← Quay lại</button>'; return; } root.innerHTML = adminModuleHeading('ORDER DETAIL', id, 'Chi tiết đơn hàng trong Mock Mode.') + `<div class="admin-detail-grid"><section class="admin-panel"><h2>Thông tin đơn hàng</h2><div class="admin-detail-list"><p><b>Buyer</b>${record[1]}</p><p><b>Seller</b>${record[2]}</p><p><b>Tổng tiền</b>${record[3]}</p><p><b>Payment</b>${record[4]}</p><p><b>Status</b>${record[5]}</p><p><b>Ngày tạo</b>${record[6]}</p></div></section><section class="admin-panel"><h2>Timeline</h2><div class="admin-timeline"><div><i></i><span>Đặt hàng<small>${record[6]}</small></span></div><div><i></i><span>Thanh toán / xử lý<small>${record[4]}</small></span></div><div><i></i><span>${record[5]}<small>Mock timeline</small></span></div></div></section></div><div class="admin-detail-actions"><button class="admin-button secondary" onclick="history.back()">← Quay lại</button></div>`; }
   function renderAdminEntityDetail(type, id) {
-    document.getElementById('admin-dashboard-view').style.display = 'none';
-    document.getElementById('admin-module-view').style.display = 'block';
-    if (type === 'orders') return renderAdminOrderDetail(id);
-    const serviceMap = { sellers: ['SellerService', 'getSeller', 'Gian hàng'], products: ['ProductService', 'getProduct', 'Sản phẩm'], users: ['UserService', 'getUser', 'Người dùng'] };
-    const [serviceName, method, label] = serviceMap[type];
-    document.getElementById('admin-module-view').innerHTML = adminModuleHeading('DETAIL', `${label} ${id}`, 'Đang tải dữ liệu bản ghi...');
-    adminService()[serviceName][method](id).then(record => {
-      if (!record) { document.getElementById('admin-module-view').innerHTML = adminModuleHeading('DETAIL', 'Không tìm thấy dữ liệu', `Không tìm thấy ${label.toLowerCase()} với mã ${id}.`) + '<button class="admin-button secondary" onclick="history.back()">← Quay lại</button>'; return; }
-      const fields = type === 'products' ? [['Tên sách', record.title], ['Tác giả', record.author], ['ISBN', record.isbn || 'Chưa có'], ['Giá', formatVND(record.discount_price || record.price)], ['Tồn kho', record.stock], ['Trạng thái', record.status]] : type === 'sellers' ? [['Tên gian hàng', record.shop_name || record.full_name], ['Owner', record.full_name], ['Email', record.email], ['Số điện thoại', record.phone || 'Chưa có'], ['Giấy phép', record.business_license || 'Chưa tải lên'], ['Trạng thái', record.status]] : [['Họ tên', record.full_name || record.username], ['Email', record.email], ['Username', record.username], ['Vai trò', record.role], ['Số điện thoại', record.phone || 'Chưa có'], ['Trạng thái', record.status]];
-      document.getElementById('admin-module-view').innerHTML = adminModuleHeading('DETAIL', `${label} ${id}`, 'Dữ liệu được tải theo đúng ID record.') + `<section class="admin-panel"><div class="admin-detail-list">${fields.map(([key, value]) => `<p><b>${key}</b><span>${value}</span></p>`).join('')}</div><div class="admin-detail-actions"><button class="admin-button secondary" onclick="history.back()">← Quay lại</button>${type === 'products' && record.status === 'PENDING' ? `<button class="admin-button primary" onclick="confirmAdminAction('Duyệt sản phẩm?', () => runAdminAction(this, () => adminService().ProductService.approveProduct('${id}'), 'Đã duyệt sản phẩm.'))">Duyệt</button><button class="admin-button danger" onclick="promptAdminReason('Từ chối sản phẩm', reason => runAdminAction(this, () => adminService().ProductService.rejectProduct('${id}', reason), 'Đã từ chối sản phẩm.'))">Từ chối</button>` : ''}${type === 'sellers' && record.status === 'PENDING_SELLER_APPROVAL' ? `<button class="admin-button primary" onclick="confirmAdminAction('Duyệt hồ sơ seller?', () => runAdminAction(this, () => adminService().SellerService.approveSeller('${id}'), 'Đã duyệt seller.'))">Duyệt</button><button class="admin-button danger" onclick="promptAdminReason('Từ chối seller', reason => runAdminAction(this, () => adminService().SellerService.rejectSeller('${id}', reason), 'Đã từ chối seller.'))">Từ chối</button>` : ''}${type === 'users' ? `<button class="admin-button danger" onclick="confirmAdminAction('${record.status === 'BANNED' ? 'Mở khóa' : 'Khóa'} tài khoản?', () => runAdminAction(this, () => adminService().UserService.toggleUser('${id}'), 'Đã cập nhật trạng thái tài khoản.'))">${record.status === 'BANNED' ? 'Mở khóa' : 'Khóa'}</button>` : ''}</div></section>`;
-    }).catch(error => { document.getElementById('admin-module-view').innerHTML = adminModuleHeading('DETAIL', 'Không thể tải dữ liệu', error.message) + '<button class="admin-button secondary" onclick="history.back()">← Quay lại</button>'; });
+    window.renderAdminEntityDetail(type, id);
   }
   return mockKey;
 }
@@ -4063,12 +4053,155 @@ function showAdminProduct(id) { history.pushState({ adminDetail: true }, '', `/a
 function showAdminUser(id) { history.pushState({ adminDetail: true }, '', `/admin/users/${id}`); renderAdminEntityDetail('users', id); }
 function openAdminOrder(id) { history.pushState({ adminDetail: true }, '', `/admin/orders/${encodeURIComponent(id)}`); renderAdminOrderDetail(id); }
 async function renderAdminOrderDetail(id) { const root = document.getElementById('admin-module-view'); document.getElementById('admin-dashboard-view').style.display = 'none'; root.style.display = 'block'; root.innerHTML = adminModuleHeading('ORDER DETAIL', `Đơn hàng #${id}`, 'Đang tải dữ liệu từ database...'); try { const order = await apiCall(`/api/admin/orders/${id}`); root.innerHTML = adminModuleHeading('ORDER DETAIL', order.order_code, 'Chi tiết đơn hàng từ backend.') + `<div class="admin-detail-grid"><section class="admin-panel"><h2>Thông tin đơn hàng</h2><div class="admin-detail-list"><p><b>Buyer</b>${order.buyer}</p><p><b>Seller</b>${order.seller}</p><p><b>Tổng tiền</b>${formatVND(order.total)}</p><p><b>Payment</b>${order.payment}</p><p><b>Status</b>${order.status}</p><p><b>Địa chỉ giao</b>${order.shipping}</p><p><b>Ngày tạo</b>${new Date(order.created_at).toLocaleString('vi-VN')}</p></div></section><section class="admin-panel"><h2>Sản phẩm</h2><div class="admin-detail-list">${order.items.map(item => `<p><b>${item.title}</b><span>${item.quantity} × ${formatVND(item.price)}</span></p>`).join('')}</div></section></div><div class="admin-detail-actions"><button class="admin-button secondary" onclick="history.back()">← Quay lại</button></div>`; } catch (error) { root.innerHTML = adminModuleHeading('ORDER DETAIL', 'Không thể tải dữ liệu', error.message) + '<button class="admin-button secondary" onclick="history.back()">← Quay lại</button>'; } }
+
 function renderAdminEntityDetail(type, id) {
-  document.getElementById('admin-dashboard-view').style.display = 'none'; document.getElementById('admin-module-view').style.display = 'block';
+  document.getElementById('admin-dashboard-view').style.display = 'none';
+  document.getElementById('admin-module-view').style.display = 'block';
   if (type === 'orders') return renderAdminOrderDetail(id);
-  const serviceMap = { sellers: ['SellerService', 'getSeller', 'Gian hàng'], products: ['ProductService', 'getProduct', 'Sản phẩm'], users: ['UserService', 'getUser', 'Người dùng'] }; const [serviceName, method, label] = serviceMap[type];
+  const serviceMap = {
+    sellers: ['SellerService', 'getSeller', 'Gian hàng'],
+    products: ['ProductService', 'getProduct', 'Sản phẩm'],
+    users: ['UserService', 'getUser', 'Người dùng']
+  };
+  const [serviceName, method, label] = serviceMap[type];
   document.getElementById('admin-module-view').innerHTML = adminModuleHeading('DETAIL', `${label} ${id}`, 'Đang tải dữ liệu bản ghi...');
-  adminService()[serviceName][method](id).then(record => { if (!record) { document.getElementById('admin-module-view').innerHTML = adminModuleHeading('DETAIL', 'Không tìm thấy dữ liệu', `Không tìm thấy ${label.toLowerCase()} với mã ${id}.`) + '<button class="admin-button secondary" onclick="history.back()">← Quay lại</button>'; return; } const fields = type === 'products' ? [['Tên sách', record.title], ['Tác giả', record.author], ['ISBN', record.isbn || 'Chưa có'], ['Giá', formatVND(record.discount_price || record.price)], ['Tồn kho', record.stock], ['Trạng thái', record.status]] : type === 'sellers' ? [['Tên gian hàng', record.shop_name || record.full_name], ['Owner', record.full_name], ['Email', record.email], ['Số điện thoại', record.phone || 'Chưa có'], ['Giấy phép', record.business_license || 'Chưa tải lên'], ['Trạng thái', record.status]] : [['Họ tên', record.full_name || record.username], ['Email', record.email], ['Username', record.username], ['Vai trò', record.role], ['Số điện thoại', record.phone || 'Chưa có'], ['Trạng thái', record.status]]; document.getElementById('admin-module-view').innerHTML = adminModuleHeading('DETAIL', `${label} ${id}`, 'Dữ liệu được tải theo đúng ID record.') + `<section class="admin-panel"><div class="admin-detail-list">${fields.map(([key, value]) => `<p><b>${key}</b><span>${value}</span></p>`).join('')}</div><div class="admin-detail-actions"><button class="admin-button secondary" onclick="history.back()">← Quay lại</button></div></section>`; }).catch(error => { document.getElementById('admin-module-view').innerHTML = adminModuleHeading('DETAIL', 'Không thể tải dữ liệu', error.message) + '<button class="admin-button secondary" onclick="history.back()">← Quay lại</button>'; });
+
+  adminService()[serviceName][method](id).then(record => {
+    if (!record) {
+      document.getElementById('admin-module-view').innerHTML = adminModuleHeading('DETAIL', 'Không tìm thấy dữ liệu', `Không tìm thấy ${label.toLowerCase()} với mã ${id}.`) + '<button class="admin-button secondary" onclick="history.back()">← Quay lại</button>';
+      return;
+    }
+
+    if (type === 'products') {
+      const coverHtml = record.cover_image 
+        ? `<div style="display: flex; gap: 20px; align-items: flex-start; margin-bottom: 20px; padding-bottom: 16px; border-bottom: 1px solid #edf1f2;">
+             <img src="${escapeHtml(record.cover_image)}" alt="${escapeHtml(record.title)}" style="width: 130px; height: 180px; object-fit: cover; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.12); flex-shrink: 0; background: #f1f5f9;">
+             <div style="flex: 1;">
+               <h2 style="font-size: 18px; font-weight: 700; color: #0f172a; margin: 0 0 6px 0;">${escapeHtml(record.title)}</h2>
+               <p style="font-size: 13px; color: #64748b; margin: 0 0 10px 0;">Tác giả: <strong style="color:#1e293b;">${escapeHtml(record.author || 'Chưa rõ')}</strong> · NXB/Gian hàng: <strong style="color:#4f46e5;">${escapeHtml(record.seller_shop_name || record.publisher || 'NXB')}</strong></p>
+               <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                 <span class="badge ${record.status === 'APPROVED' ? 'badge-success' : (record.status === 'PENDING' ? 'badge-warning' : 'badge-danger')}" style="padding: 4px 10px; font-size: 12px; font-weight: 700;">
+                   ${record.status === 'APPROVED' ? 'ĐÃ DUYỆT (ONLINE)' : (record.status === 'PENDING' ? 'CHỜ ADMIN DUYỆT' : 'ĐÃ TỪ CHỐI')}
+                 </span>
+                 ${record.vip_eligible ? '<span style="background: #fef3c7; color: #b45309; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 600;">👑 Ebook VIP</span>' : ''}
+                 <span style="background: #e0f2fe; color: #0369a1; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 600;">📁 ${escapeHtml(record.category_name || 'Chưa phân loại')}</span>
+               </div>
+             </div>
+           </div>`
+        : '';
+
+      const fields = [
+        ['Tên sách', escapeHtml(record.title)],
+        ['Tác giả', escapeHtml(record.author || 'Chưa rõ')],
+        ['Nhà xuất bản / Gian hàng', escapeHtml(record.seller_shop_name || record.publisher || 'NXB')],
+        ['Thể loại', escapeHtml(record.category_name || 'Chưa phân loại')],
+        ['Mã ISBN', escapeHtml(record.isbn || 'Chưa có')],
+        ['Năm xuất bản', record.publication_year || 'Chưa cập nhật'],
+        ['Số trang', record.page_count ? `${record.page_count} trang` : 'Chưa cập nhật'],
+        ['Định dạng sách', record.book_format === 'EBOOK' ? 'Ebook điện tử' : (record.book_format === 'COMBO' ? 'Combo Sách giấy + Ebook' : 'Sách in')],
+        ['Loại bìa', record.cover_type === 'HARDCOVER' ? 'Bìa cứng' : 'Bìa mềm'],
+        ['Giá bán hiện tại', `<b style="color: #059669; font-size: 13px;">${formatVND(record.discount_price || record.price)}</b>`],
+        ['Giá gốc niêm yết', record.price ? formatVND(record.price) : 'Chưa có'],
+        ['Tồn kho', `${record.stock} cuốn`],
+        ['Trạng thái', `<span class="badge ${record.status === 'APPROVED' ? 'badge-success' : (record.status === 'PENDING' ? 'badge-warning' : 'badge-danger')}">${record.status}</span>`]
+      ];
+
+      if (record.rejection_reason) {
+        fields.push(['Lý do từ chối', `<span style="color:#ef4444; font-weight:600;">${escapeHtml(record.rejection_reason)}</span>`]);
+      }
+
+      const descHtml = `
+        <div style="margin-top: 24px; padding-top: 20px; border-top: 1px solid #edf1f2;">
+          <h3 style="font-size: 14px; font-weight: 700; color: #1e293b; margin: 0 0 12px 0; display: flex; align-items: center; gap: 8px;">
+            <span>📝</span> Mô Tả Chi Tiết Sách (NXB cung cấp khi xuất bản)
+          </h3>
+          <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 18px 20px; font-size: 13px; line-height: 1.75; color: #334155; white-space: pre-wrap; word-break: break-word; max-height: 450px; overflow-y: auto;">
+            ${record.description ? escapeHtml(record.description) : '<em style="color:#94a3b8;">NXB chưa nhập phần mô tả cho cuốn sách này.</em>'}
+          </div>
+        </div>
+      `;
+
+      const sampleHtml = (record.sample_content || record.preview_file_url) ? `
+        <div style="margin-top: 20px; padding-top: 16px; border-top: 1px dashed #cbd5e1;">
+          <h3 style="font-size: 13px; font-weight: 700; color: #1e293b; margin: 0 0 10px 0; display: flex; align-items: center; gap: 6px;">
+            <span>📖</span> Trích đoạn đọc thử / File xem trước
+          </h3>
+          ${record.sample_content ? `<div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 6px; padding: 14px; font-size: 12px; line-height: 1.65; color: #475569; max-height: 220px; overflow-y: auto; white-space: pre-wrap;">${escapeHtml(record.sample_content)}</div>` : ''}
+          ${record.preview_file_url ? `<div style="margin-top: 10px;"><a href="${escapeHtml(record.preview_file_url)}" target="_blank" class="admin-button secondary" style="display:inline-flex; align-items:center; gap:6px; font-size:12px; text-decoration:none;">📄 Xem tệp PDF / Preview đính kèm</a></div>` : ''}
+        </div>
+      ` : '';
+
+      const actionsHtml = `
+        <div class="admin-detail-actions" style="margin-top: 24px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+          <button class="admin-button secondary" onclick="history.back()">← Quay lại</button>
+          ${record.status === 'PENDING' ? `
+            <button class="admin-button primary" style="background:#10b981; border-color:#059669;" onclick="confirmAdminAction('Phê duyệt cho phép cuốn sách này mở bán trên sàn BookHub?', () => runAdminAction(this, () => adminService().ProductService.approveProduct('${id}'), 'Đã duyệt sản phẩm thành công!').then(() => renderAdminEntityDetail('products', '${id}')))">✅ Phê Duyệt Xuất Bản</button>
+            <button class="admin-button danger" onclick="promptAdminReason('Nhập lý do từ chối sách', reason => runAdminAction(this, () => adminService().ProductService.rejectProduct('${id}', reason), 'Đã từ chối sản phẩm.').then(() => renderAdminEntityDetail('products', '${id}')))">❌ Từ Chối Duyệt</button>
+          ` : (record.status === 'REJECTED' ? `
+            <button class="admin-button primary" style="background:#10b981; border-color:#059669;" onclick="confirmAdminAction('Xem xét duyệt lại cuốn sách này?', () => runAdminAction(this, () => adminService().ProductService.approveProduct('${id}'), 'Đã duyệt sản phẩm thành công!').then(() => renderAdminEntityDetail('products', '${id}')))">✅ Duyệt Lại Sách Này</button>
+          ` : `
+            <button class="admin-button danger" onclick="promptAdminReason('Lý do gỡ / ngừng bán sách này', reason => runAdminAction(this, () => adminService().ProductService.rejectProduct('${id}', reason), 'Đã gỡ sách khỏi marketplace.').then(() => renderAdminEntityDetail('products', '${id}')))">🚫 Ngừng Bán / Gỡ Sách</button>
+          `)}
+        </div>
+      `;
+
+      document.getElementById('admin-module-view').innerHTML = adminModuleHeading('DETAIL', `Sản phẩm #${id}`, 'Dữ liệu thẩm định sách và mô tả do NXB cung cấp.') + `
+        <section class="admin-panel" style="max-width: 960px;">
+          ${coverHtml}
+          <div class="admin-detail-list">
+            ${fields.map(([key, value]) => `<p><b>${key}</b><span>${value}</span></p>`).join('')}
+          </div>
+          ${descHtml}
+          ${sampleHtml}
+          ${actionsHtml}
+        </section>
+      `;
+      return;
+    }
+
+    // Sellers or Users detail
+    const fields = type === 'sellers'
+      ? [
+          ['Tên gian hàng', escapeHtml(record.shop_name || record.full_name)],
+          ['Tên pháp lý / Người đại diện', escapeHtml(record.full_name || record.username)],
+          ['Email', escapeHtml(record.email)],
+          ['Số điện thoại', escapeHtml(record.phone || 'Chưa có')],
+          ['Giấy phép KD', escapeHtml(record.business_license || 'Chưa tải lên')],
+          ['Loại hình', escapeHtml(record.business_type || 'Chưa cập nhật')],
+          ['Mã số thuế', escapeHtml(record.tax_code || 'Chưa cập nhật')],
+          ['Địa chỉ kho / Trụ sở', escapeHtml(record.warehouse_address || record.office_address || 'Chưa cập nhật')],
+          ['Mô tả gian hàng', escapeHtml(record.shop_description || 'Chưa có')],
+          ['Trạng thái', record.status]
+        ]
+      : [
+          ['Họ tên', escapeHtml(record.full_name || record.username)],
+          ['Email', escapeHtml(record.email)],
+          ['Username', escapeHtml(record.username)],
+          ['Vai trò', escapeHtml(record.role)],
+          ['Số điện thoại', escapeHtml(record.phone || 'Chưa có')],
+          ['Trạng thái', record.status]
+        ];
+
+    document.getElementById('admin-module-view').innerHTML = adminModuleHeading('DETAIL', `${label} ${id}`, 'Dữ liệu được tải theo đúng ID record.') + `
+      <section class="admin-panel">
+        <div class="admin-detail-list">
+          ${fields.map(([key, value]) => `<p><b>${key}</b><span>${value}</span></p>`).join('')}
+        </div>
+        <div class="admin-detail-actions" style="margin-top: 20px; display: flex; gap: 10px;">
+          <button class="admin-button secondary" onclick="history.back()">← Quay lại</button>
+          ${type === 'sellers' && record.status === 'PENDING_SELLER_APPROVAL' ? `
+            <button class="admin-button primary" onclick="confirmAdminAction('Duyệt hồ sơ seller?', () => runAdminAction(this, () => adminService().SellerService.approveSeller('${id}'), 'Đã duyệt seller.').then(() => renderAdminEntityDetail('sellers', '${id}')))">Duyệt</button>
+            <button class="admin-button danger" onclick="promptAdminReason('Từ chối seller', reason => runAdminAction(this, () => adminService().SellerService.rejectSeller('${id}', reason), 'Đã từ chối seller.').then(() => renderAdminEntityDetail('sellers', '${id}')))">Từ chối</button>
+          ` : ''}
+          ${type === 'users' ? `
+            <button class="admin-button danger" onclick="confirmAdminAction('${record.status === 'BANNED' ? 'Mở khóa' : 'Khóa'} tài khoản?', () => runAdminAction(this, () => adminService().UserService.toggleUser('${id}'), 'Đã cập nhật trạng thái tài khoản.').then(() => renderAdminEntityDetail('users', '${id}')))">${record.status === 'BANNED' ? 'Mở khóa' : 'Khóa'}</button>
+          ` : ''}
+        </div>
+      </section>
+    `;
+  }).catch(error => {
+    document.getElementById('admin-module-view').innerHTML = adminModuleHeading('DETAIL', 'Không thể tải dữ liệu', error.message) + '<button class="admin-button secondary" onclick="history.back()">← Quay lại</button>';
+  });
 }
 
 async function loadPendingSellers() {
