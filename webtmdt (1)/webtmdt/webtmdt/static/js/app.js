@@ -1423,7 +1423,7 @@ async function openMyOrdersModal() {
               Tổng tiền: <b style="color:#ef4444;">${formatVND(o.total_amount)}</b> | ${new Date(o.created_at).toLocaleDateString('vi-VN')}
             </div>
             <button class="btn-primary" style="padding:4px 10px; font-size:12px;" onclick="closeModal('my-orders-modal'); openOrderTrackerModal(${o.id})">
-              🚚 Xem lộ trình vận chuyển
+              🔍 Xem chi tiết đơn hàng
             </button>
           </div>
         `;

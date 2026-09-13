@@ -1671,10 +1671,8 @@ async function openOrderDetailModal(orderId) {
 
     // Action buttons inside detail modal
     let confirmReceivedBtn = '';
-    if (order.status === 'PENDING' || order.status === 'PACKING') {
-      confirmReceivedBtn = `<button disabled style="padding:8px 16px; font-size:13px; font-weight:700; background:#cbd5e1; color:#64748b; border:none; border-radius:6px; cursor:not-allowed;" title="Đơn hàng đang chuẩn bị, chưa thể xác nhận nhận hàng">✅ Đã nhận được hàng</button>`;
-    } else if (order.status === 'SHIPPING') {
-      confirmReceivedBtn = `<button class="btn-danger" style="padding:8px 16px; font-size:13px; font-weight:700; background:#ef4444; color:#fff; border:none; border-radius:6px; cursor:pointer;" onclick="handleConfirmOrderReceived(${order.id})">✅ Đã nhận được hàng</button>`;
+    if (order.status === 'SHIPPING') {
+      confirmReceivedBtn = `<button class="btn-success" style="padding:8px 16px; font-size:13px; font-weight:700; background:#10b981; color:#fff; border:none; border-radius:6px; cursor:pointer;" onclick="handleConfirmOrderReceived(${order.id})">✅ Đã nhận được hàng</button>`;
     }
 
     let reviewBtn = '';
@@ -1794,7 +1792,7 @@ async function handleConfirmOrderReceived(orderId) {
     // Reload list if modal is open
     const myOrdersModal = document.getElementById('my-orders-modal');
     if (myOrdersModal && myOrdersModal.classList.contains('open')) {
-      openMyOrdersModal();
+      await openMyOrdersModal();
     }
 
     // Open review modal immediately!
@@ -1911,6 +1909,31 @@ async function openMyOrdersModal() {
         if (o.status === 'DELIVERED') statusBadge = '<span class="badge badge-success">Đã giao thành công</span>';
         if (o.status === 'CANCELLED') statusBadge = '<span class="badge badge-danger">Đã hủy</span>';
 
+        let cardActions = `
+          <button class="btn-primary" style="padding:6px 14px; font-size:12px;" onclick="event.stopPropagation(); openOrderDetailModal(${o.id})">
+            📄 Chi tiết đơn hàng
+          </button>
+        `;
+
+        if (o.status === 'SHIPPING') {
+          cardActions += `
+            <button class="btn-success" style="padding:6px 14px; font-size:12px; background:#10b981; color:#fff; border:none; border-radius:6px; font-weight:700; cursor:pointer;" onclick="event.stopPropagation(); handleConfirmOrderReceived(${o.id})">
+              ✅ Đã nhận được hàng
+            </button>
+          `;
+        }
+
+        if (o.status === 'DELIVERED') {
+          cardActions += `
+            <button class="btn-preview" style="padding:6px 14px; font-size:12px; font-weight:700;" onclick="event.stopPropagation(); openOrderReviewModal(${o.id})">
+              ⭐ Đánh giá sản phẩm
+            </button>
+            <button class="btn-secondary" style="padding:6px 14px; font-size:12px;" onclick="event.stopPropagation(); openReturnRequestModal(${o.id})">
+              ↩️ Yêu cầu trả hàng
+            </button>
+          `;
+        }
+
         html += `
           <div onclick="openOrderDetailModal(${o.id})" style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:16px; margin-bottom:12px; cursor:pointer; transition:all 0.2s;" onmouseover="this.style.borderColor='#3b82f6'; this.style.boxShadow='0 4px 6px -1px rgba(0,0,0,0.1)'" onmouseout="this.style.borderColor='#e2e8f0'; this.style.boxShadow='none'">
             <div style="display:flex; justify-content:space-between; margin-bottom:8px; align-items:center;">
@@ -1921,9 +1944,7 @@ async function openMyOrdersModal() {
               Tổng tiền: <b style="color:#ef4444;">${formatVND(o.total_amount)}</b> | Ngày đặt: ${new Date(o.created_at).toLocaleDateString('vi-VN')}
             </div>
             <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
-              <button class="btn-primary" style="padding:6px 14px; font-size:12px;" onclick="event.stopPropagation(); openOrderDetailModal(${o.id})">
-                📄 Chi tiết đơn hàng
-              </button>
+              ${cardActions}
             </div>
           </div>
         `;
