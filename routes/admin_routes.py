@@ -296,6 +296,8 @@ def approve_book(
     book = db.query(models.Book).filter(models.Book.id == book_id).first()
     if not book:
         raise HTTPException(status_code=404, detail="Không tìm thấy sách")
+    if book.status != models.BookStatus.PENDING.value:
+        raise HTTPException(status_code=409, detail="Sách không còn ở trạng thái chờ duyệt")
     
     book.status = models.BookStatus.APPROVED.value
     book.is_visible = True
@@ -323,6 +325,8 @@ def reject_book(
     book = db.query(models.Book).filter(models.Book.id == book_id).first()
     if not book:
         raise HTTPException(status_code=404, detail="Không tìm thấy sách")
+    if book.status != models.BookStatus.PENDING.value:
+        raise HTTPException(status_code=409, detail="Sách không còn ở trạng thái chờ duyệt")
     
     book.status = models.BookStatus.REJECTED.value
     book.is_visible = False

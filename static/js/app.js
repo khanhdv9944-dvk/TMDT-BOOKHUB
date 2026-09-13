@@ -4725,7 +4725,7 @@ async function loadPendingBooks() {
           b.stock,
           '<span class="admin-status warning">Chờ duyệt</span>'
         ]})),
-        (id, record) => `<button class="admin-row-action" onclick="showAdminProduct('${id}')">Xem</button><button class="admin-row-action" onclick="updateCustomBookStatusInLocalStorage('${id}', 'APPROVED'); confirmAdminAction('Duyệt sản phẩm?', () => runAdminAction(this, () => adminService().ProductService.approveProduct('${id}'), 'Đã duyệt sản phẩm.').then(() => { loadPendingBooks(); updateAdminSidebarBadges(); }))">Duyệt</button><button class="admin-row-action danger-text" onclick="promptAdminReason('Từ chối sản phẩm', reason => { updateCustomBookStatusInLocalStorage('${id}', 'REJECTED', reason); runAdminAction(this, () => adminService().ProductService.rejectProduct('${id}', reason), 'Đã từ chối sản phẩm.').then(() => { loadPendingBooks(); updateAdminSidebarBadges(); }); })">Từ chối</button>`
+        (id, record) => `<button class="admin-row-action" onclick="showAdminProduct('${id}')">Xem</button><button class="admin-row-action" onclick="approveBookByAdmin(this, '${id}')">Duyệt</button><button class="admin-row-action danger-text" onclick="rejectBookByAdmin(this, '${id}')">Từ chối</button>`
       );
     }
 
@@ -4757,8 +4757,8 @@ async function loadPendingBooks() {
               </td>
               <td>
                 <div style="display:flex; gap:6px; flex-wrap:wrap;">
-                  <button class="btn-success" style="font-size:12px;" onclick="approveBookByAdmin(${b.id})">✅ Duyệt Lên Sàn</button>
-                  <button class="btn-danger" style="font-size:12px;" onclick="rejectBookByAdmin(${b.id})">❌ Từ Chối</button>
+                  <button class="btn-success" style="font-size:12px;" onclick="approveBookByAdmin(this, ${b.id})">✅ Duyệt Lên Sàn</button>
+                  <button class="btn-danger" style="font-size:12px;" onclick="rejectBookByAdmin(this, ${b.id})">❌ Từ Chối</button>
                 </div>
               </td>
             </tr>
@@ -4772,15 +4772,19 @@ async function loadPendingBooks() {
   }
 }
 
-async function approveBookByAdmin(bookId) {
-  updateCustomBookStatusInLocalStorage(bookId, 'APPROVED');
-  confirmAdminAction('Duyệt sản phẩm?', () => runAdminAction(document.activeElement, () => adminService().ProductService.approveProduct(bookId), 'Đã duyệt sản phẩm.').then(() => { loadPendingBooks(); updateAdminSidebarBadges(); }));
+async function approveBookByAdmin(button, bookId) {
+  confirmAdminAction('Duyệt sản phẩm?', () => runAdminAction(button, () => adminService().ProductService.approveProduct(bookId), 'Đã duyệt sản phẩm.').then(() => {
+    updateCustomBookStatusInLocalStorage(bookId, 'APPROVED');
+    return Promise.all([loadPendingBooks(), updateAdminSidebarBadges()]);
+  }));
 }
 
-async function rejectBookByAdmin(bookId) {
+async function rejectBookByAdmin(button, bookId) {
   promptAdminReason('Từ chối sản phẩm', reason => {
-    updateCustomBookStatusInLocalStorage(bookId, 'REJECTED', reason);
-    return runAdminAction(document.activeElement, () => adminService().ProductService.rejectProduct(bookId, reason), 'Đã từ chối sản phẩm.').then(() => { loadPendingBooks(); updateAdminSidebarBadges(); });
+    return runAdminAction(button, () => adminService().ProductService.rejectProduct(bookId, reason), 'Đã từ chối sản phẩm.').then(() => {
+      updateCustomBookStatusInLocalStorage(bookId, 'REJECTED', reason);
+      return Promise.all([loadPendingBooks(), updateAdminSidebarBadges()]);
+    });
   });
 }
 

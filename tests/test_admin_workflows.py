@@ -31,6 +31,20 @@ class AdminWorkflowTests(unittest.TestCase):
         self.payout = models.WithdrawalRequest(seller_id=self.seller.id, amount=100000, bank_name="Test Bank", bank_account_number="1234", bank_account_holder="Seller", status="PENDING")
         self.db.add_all([self.dispute, self.payout]); self.db.commit(); self.db.refresh(self.dispute); self.db.refresh(self.payout)
 
+        self.category = models.Category(name="Workflow Books", slug="workflow-books")
+        self.db.add(self.category); self.db.commit(); self.db.refresh(self.category)
+        self.pending_book = models.Book(
+            seller_id=self.seller.id,
+            category_id=self.category.id,
+            title="Pending workflow book",
+            author="Workflow author",
+            price=100000,
+            stock=5,
+            status=models.BookStatus.PENDING.value,
+            is_visible=True,
+        )
+        self.db.add(self.pending_book); self.db.commit(); self.db.refresh(self.pending_book)
+
         def override_get_db():
             db = database.SessionLocal()
             try:
@@ -53,6 +67,41 @@ class AdminWorkflowTests(unittest.TestCase):
         self.db.expire_all()
         saved = self.db.get(models.Dispute, self.dispute.id)
         self.assertEqual(saved.admin_decision, "REFUND_BUYER")
+
+    def test_admin_approval_moves_book_out_of_pending_and_publishes_it(self):
+        pending = self.client.get("/api/admin/books/pending", headers=self.headers)
+        self.assertEqual(pending.status_code, 200)
+        self.assertIn(self.pending_book.id, [book["id"] for book in pending.json()])
+
+        response = self.client.post(f"/api/admin/books/{self.pending_book.id}/approve", headers=self.headers)
+        self.assertEqual(response.status_code, 200, response.text)
+        self.db.expire_all()
+        saved = self.db.get(models.Book, self.pending_book.id)
+        self.assertEqual(saved.status, models.BookStatus.APPROVED.value)
+        self.assertTrue(saved.is_visible)
+        pending_after = self.client.get("/api/admin/books/pending", headers=self.headers)
+        self.assertNotIn(self.pending_book.id, [book["id"] for book in pending_after.json()])
+
+    def test_admin_rejection_keeps_book_hidden_and_records_reason(self):
+        response = self.client.post(
+            f"/api/admin/books/{self.pending_book.id}/reject",
+            json={"reason": "Thiếu thông tin xuất bản"},
+            headers=self.headers,
+        )
+        self.assertEqual(response.status_code, 200, response.text)
+        self.db.expire_all()
+        saved = self.db.get(models.Book, self.pending_book.id)
+        self.assertEqual(saved.status, models.BookStatus.REJECTED.value)
+        self.assertFalse(saved.is_visible)
+        self.assertEqual(saved.rejection_reason, "Thiếu thông tin xuất bản")
+
+    def test_non_admin_cannot_approve_book(self):
+        token = auth.create_access_token({"sub": self.seller.username, "role": "SELLER"})
+        response = self.client.post(
+            f"/api/admin/books/{self.pending_book.id}/approve",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        self.assertEqual(response.status_code, 403)
 
     def test_admin_payout_approval_creates_pending_transaction(self):
         response = self.client.post(f"/api/admin/payouts/{self.payout.id}/approve", headers=self.headers)
