@@ -313,7 +313,12 @@ def approve_book(
     except Exception as e:
         print(f"[NOTIFICATION ERROR] Không thể gửi thông báo phê duyệt tới NXB: {e}")
 
-    return {"message": f"Đã duyệt cho phép cuốn '{book.title}' mở bán trên trang chủ!"}
+    return {
+        "message": f"Đã duyệt cho phép cuốn '{book.title}' mở bán trên trang chủ!",
+        "book_id": book.id,
+        "status": book.status,
+        "is_visible": book.is_visible,
+    }
 
 @router.post("/books/{book_id}/reject")
 def reject_book(
@@ -343,7 +348,13 @@ def reject_book(
     except Exception as e:
         print(f"[NOTIFICATION ERROR] Không thể gửi thông báo từ chối tới NXB: {e}")
 
-    return {"message": f"Đã từ chối cuốn '{book.title}'"}
+    return {
+        "message": f"Đã từ chối cuốn '{book.title}'",
+        "book_id": book.id,
+        "status": book.status,
+        "is_visible": book.is_visible,
+        "rejection_reason": book.rejection_reason,
+    }
 
 
 @router.get("/disputes", response_model=List[schemas.DisputeOut])

@@ -4406,7 +4406,7 @@ function renderAdminDetail(type, id) { document.querySelectorAll('.admin-nav-ite
 function renderDisputeDetail(id) { adminService().DisputeService.getDispute(id).then(item => { const root = document.getElementById('admin-module-view'); if (!item) { root.innerHTML = adminModuleHeading('RISK & SUPPORT', 'Không tìm thấy tranh chấp', 'Dữ liệu có thể đã bị xóa hoặc chưa được đồng bộ.'); return; } root.innerHTML = adminModuleHeading('DISPUTE DETAIL', `${item.id} · ${item.reason}`, `Đơn hàng ${item.orderId} · ${item.status}`) + `<div class="admin-detail-grid"><section class="admin-panel"><h2>Thông tin đơn hàng</h2><div class="admin-detail-list"><p><b>Buyer</b>${item.buyer}</p><p><b>Seller</b>${item.seller}</p><p><b>Số tiền</b>${formatVND(item.amount)}</p><p><b>Mô tả</b>${item.description}</p><p><b>Buyer response</b>${item.buyerResponse || 'Chưa có'}</p><p><b>Seller response</b>${item.sellerResponse || 'Chưa có'}</p></div></section><section class="admin-panel"><h2>Evidence & timeline</h2><div class="admin-evidence-list">${item.evidence.map(doc => `<button class="admin-document-link" onclick="openAdminDocument('${doc.id || 'DOC-01'}')">▧ ${doc.fileName}</button>`).join('')}</div><div class="admin-timeline">${item.timeline.map(event => `<div><i></i><span>${event.label}<small>${new Date(event.at).toLocaleString('vi-VN')}</small></span></div>`).join('')}</div></section></div><div class="admin-detail-actions"><button class="admin-button secondary" onclick="runAdminAction(this, () => adminService().DisputeService.requestSellerResponse('${item.id}'), 'Đã yêu cầu seller phản hồi.')">Yêu cầu seller phản hồi</button><button class="admin-button primary" onclick="confirmAdminAction('Hoàn tiền buyer?', () => runAdminAction(this, () => adminService().DisputeService.resolveDispute('${item.id}', 'REFUND_BUYER', 'Mock refund decision'), 'Đã cập nhật quyết định mock: hoàn tiền buyer.'))">Hoàn tiền buyer</button><button class="admin-button secondary" onclick="confirmAdminAction('Giải quyết cho seller?', () => runAdminAction(this, () => adminService().DisputeService.resolveDispute('${item.id}', 'RESOLVE_FOR_SELLER', 'Mock seller resolution'), 'Đã cập nhật quyết định mock cho seller.'))">Giải quyết cho seller</button><button class="admin-button danger" onclick="promptAdminReason('Từ chối khiếu nại', reason => runAdminAction(this, () => adminService().DisputeService.rejectDispute('${item.id}', reason), 'Đã từ chối khiếu nại trong mock state.'))">Từ chối khiếu nại</button></div>`; }).catch(error => showToast(`Không thể tải tranh chấp: ${error.message}`, 'error')); }
 function renderPayoutDetail(id) { adminService().PayoutService.getPayout(id).then(item => { const root = document.getElementById('admin-module-view'); if (!item) { root.innerHTML = adminModuleHeading('FINANCE', 'Không tìm thấy yêu cầu', 'Dữ liệu payout chưa được đồng bộ.'); return; } root.innerHTML = adminModuleHeading('PAYOUT DETAIL', item.id, `${item.seller} · ${item.status}`) + `<div class="admin-detail-grid"><section class="admin-panel"><h2>Thông tin payout</h2><div class="admin-detail-list"><p><b>Seller</b>${item.seller}</p><p><b>Số dư khả dụng</b>${formatVND(item.availableBalance)}</p><p><b>Số tiền yêu cầu</b>${formatVND(item.amount)}</p><p><b>Ngân hàng</b>${item.bankName}</p><p><b>Chủ tài khoản</b>${item.accountName}</p><p><b>Số tài khoản</b>${item.accountNumberMasked}</p></div></section><section class="admin-panel"><h2>Lịch sử request</h2><div class="admin-timeline">${item.history.map(event => `<div><i></i><span>${event.label}<small>${new Date(event.at).toLocaleString('vi-VN')}</small></span></div>`).join('')}</div></section></div><div class="admin-detail-actions"><button class="admin-button primary" onclick="confirmAdminAction('Duyệt yêu cầu rút tiền?', () => runAdminAction(this, () => adminService().PayoutService.approvePayout('${item.id}'), 'Đã duyệt trong mock state. Chưa có chuyển tiền thật.'))">Duyệt yêu cầu</button><button class="admin-button danger" onclick="promptAdminReason('Từ chối payout', reason => runAdminAction(this, () => adminService().PayoutService.rejectPayout('${item.id}', reason), 'Đã từ chối payout trong mock state.'))">Từ chối</button></div>`; }).catch(error => showToast(`Không thể tải payout: ${error.message}`, 'error')); }
 function runAdminAction(button, operation, successMessage) { const target = button && button instanceof HTMLElement ? button : null; const original = target?.textContent || ''; if (target) { target.disabled = true; target.textContent = 'Đang xử lý...'; } return operation().then(() => { showToast(successMessage, 'success'); return true; }).catch(error => { showToast(`Không thể xử lý: ${error.message}`, 'error'); return false; }).finally(() => { if (target) { target.disabled = false; target.textContent = original; } }); }
-function confirmAdminAction(title, callback) { if (window.confirm(`${title}\n\nĐây là thao tác mock; backend cần xác thực lại.`)) callback(); }
+function confirmAdminAction(title, callback) { if (window.confirm(`${title}\n\nBạn có chắc chắn muốn thực hiện thao tác này?`)) return callback(); return Promise.resolve(false); }
 function promptAdminReason(title, callback) { const reason = window.prompt(`${title}\nNhập lý do:`); if (reason?.trim()) callback(reason.trim()); else if (reason !== null) showToast('Vui lòng nhập lý do.', 'warning'); }
 function openAdminDocument(id) {
   adminService().DocumentService.getDocumentPreview(id).then(doc => {
@@ -4689,21 +4689,7 @@ async function rejectSellerByAdmin(sellerId) {
 
 async function loadPendingBooks() {
   try {
-    let books = [];
-    try {
-      books = await apiCall('/api/admin/books/pending');
-    } catch (err) {
-      books = [];
-    }
-
-    // Merge custom pending books từ LocalStorage để bảo toàn dữ liệu trên Vercel Serverless
-    const customPending = getCustomBooksFromLocalStorage().filter(b => b.status === 'PENDING' || !b.status);
-    const apiBookIds = new Set(books.map(b => String(b.id)));
-    customPending.forEach(cb => {
-      if (!apiBookIds.has(String(cb.id))) {
-        books.unshift(cb);
-      }
-    });
+    const books = await apiCall('/api/admin/books/pending');
 
     // Luôn cập nhật badge số lượng sách chờ duyệt
     const prodBadge = document.getElementById('admin-products-badge');
@@ -4774,7 +4760,6 @@ async function loadPendingBooks() {
 
 async function approveBookByAdmin(button, bookId) {
   confirmAdminAction('Duyệt sản phẩm?', () => runAdminAction(button, () => adminService().ProductService.approveProduct(bookId), 'Đã duyệt sản phẩm.').then(() => {
-    updateCustomBookStatusInLocalStorage(bookId, 'APPROVED');
     return Promise.all([loadPendingBooks(), updateAdminSidebarBadges()]);
   }));
 }
@@ -4782,7 +4767,6 @@ async function approveBookByAdmin(button, bookId) {
 async function rejectBookByAdmin(button, bookId) {
   promptAdminReason('Từ chối sản phẩm', reason => {
     return runAdminAction(button, () => adminService().ProductService.rejectProduct(bookId, reason), 'Đã từ chối sản phẩm.').then(() => {
-      updateCustomBookStatusInLocalStorage(bookId, 'REJECTED', reason);
       return Promise.all([loadPendingBooks(), updateAdminSidebarBadges()]);
     });
   });
