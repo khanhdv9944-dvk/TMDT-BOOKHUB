@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from database import get_db
 import models, schemas, auth
+import notification_service
 
 router = APIRouter(prefix="/api/orders", tags=["Orders"])
 
@@ -378,6 +379,12 @@ def create_order(
     db.commit()
     db.refresh(new_order)
 
+    # 📲 Gửi thông báo Giai đoạn 1: Đặt hàng thành công
+    try:
+        notification_service.notify_order_created(db, new_order, current_user)
+    except Exception:
+        pass  # Không để lỗi thông báo ảnh hưởng tới luồng đặt hàng
+
     return new_order
 
 @router.get("/my-orders", response_model=List[schemas.OrderOut])
@@ -406,4 +413,36 @@ def get_order_detail(
     if order.buyer_id != current_user.id and current_user.role not in [models.UserRole.ADMIN.value, models.UserRole.SELLER.value]:
         raise HTTPException(status_code=403, detail="Không có quyền xem đơn hàng này")
     
+    return order
+
+@router.post("/{order_id:int}/confirm-received", response_model=schemas.OrderOut)
+def confirm_order_received(
+    order_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.get_current_user)
+):
+    order = db.query(models.Order).filter(models.Order.id == order_id).first()
+    if not order:
+        raise HTTPException(status_code=404, detail="Không tìm thấy đơn hàng")
+    if order.buyer_id != current_user.id and current_user.role not in [models.UserRole.ADMIN.value]:
+        raise HTTPException(status_code=403, detail="Bạn không có quyền thao tác trên đơn hàng này")
+    if order.status == models.OrderStatus.DELIVERED.value:
+        return order
+    if order.status == models.OrderStatus.CANCELLED.value:
+        raise HTTPException(status_code=400, detail="Không thể xác nhận đơn hàng đã bị hủy")
+
+    order.status = models.OrderStatus.DELIVERED.value
+    order.tracking_step = 4
+    if order.payment_method == "COD":
+        order.payment_status = models.PaymentStatus.PAID.value
+    order.updated_at = datetime.utcnow()
+    db.commit()
+    db.refresh(order)
+
+    # ✅ Gửi thông báo Giai đoạn 3: Xác nhận nhận hàng
+    try:
+        notification_service.notify_order_delivered(db, order, current_user)
+    except Exception:
+        pass  # Không để lỗi thông báo ảnh hưởng tới luồng xác nhận
+
     return order

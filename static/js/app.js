@@ -978,7 +978,7 @@ async function renderBookDetail(book) {
       </section>
       <section class="detail-section"><h2>Thông tin chi tiết</h2><div class="spec-grid"><div><span>Mã sản phẩm</span><strong>BH-${book.id}</strong></div><div><span>ISBN</span><strong>${book.isbn || 'Đang cập nhật'}</strong></div><div><span>Tác giả</span><strong>${book.author || 'Đang cập nhật'}</strong></div><div><span>Nhà xuất bản</span><strong>${book.publisher || 'Đang cập nhật'}</strong></div><div><span>Năm xuất bản</span><strong>${book.publication_year || new Date(book.created_at || Date.now()).getFullYear()}</strong></div><div><span>Ngôn ngữ</span><strong>${book.language || 'Tiếng Việt'}</strong></div><div><span>Số trang</span><strong>${book.page_count || 'Đang cập nhật'}</strong></div><div><span>Kích thước</span><strong>${book.size || '13 x 20 cm'}</strong></div><div><span>Loại bìa</span><strong>${book.cover_type === 'HARD' ? 'Bìa cứng' : 'Bìa mềm'}</strong></div><div><span>Thể loại</span><strong>${book.category?.name || book.category_name || 'Tổng hợp'}</strong></div></div></section>
       <section class="detail-section"><h2>Mô tả sản phẩm</h2><div id="detail-description" class="detail-description collapsed">${book.description || 'Mô tả sản phẩm đang được cập nhật.'}</div><button class="detail-more-button" onclick="toggleDetailDescription(this)">Xem thêm</button></section>
-      <section id="reviews" class="detail-section review-section"><div class="review-heading"><div><h2>Đánh giá sản phẩm</h2><div class="review-score"><span>★★★★★</span><strong>${Number(reviewSummary.average_rating || book.rating || 0).toFixed(1)} / 5</strong><small>${reviewSummary.total_reviews || reviews.length} đánh giá</small></div></div><button class="btn-preview" onclick="${state.currentUser ? `openMyOrdersModal()` : `showAuthPage(); switchAuthTab('login')`} ">${state.currentUser ? 'Viết đánh giá' : 'Đăng nhập để đánh giá'}</button></div>${renderReviewDistribution(reviewSummary.rating_distribution || { '5': 0, '4': 0, '3': 0, '2': 0, '1': 0 })}<div class="review-filters"><button class="active" onclick="filterDetailReviews(0, this)">Tất cả</button>${[5,4,3,2,1].map(star => `<button onclick="filterDetailReviews(${star}, this)">${star} sao</button>`).join('')}</div><div id="detail-reviews-list">${renderDetailReviews(reviews)}</div></section>
+      <section id="reviews" class="detail-section review-section"><div class="review-heading"><div><h2>Đánh giá sản phẩm</h2><div class="review-score"><span>★★★★★</span><strong>${Number(reviewSummary.average_rating || book.rating || 0).toFixed(1)} / 5</strong><small>${reviewSummary.total_reviews || reviews.length} đánh giá</small></div></div><button class="btn-preview" onclick="handleWriteReviewForBook(${book.id})">⭐ Viết đánh giá</button></div>${renderReviewDistribution(reviewSummary.rating_distribution || { '5': 0, '4': 0, '3': 0, '2': 0, '1': 0 })}<div class="review-filters"><button class="active" onclick="filterDetailReviews(0, this)">Tất cả</button>${[5,4,3,2,1].map(star => `<button onclick="filterDetailReviews(${star}, this)">${star} sao</button>`).join('')}</div><div id="detail-reviews-list">${renderDetailReviews(reviews)}</div></section>
       <section class="detail-section related-section"><div class="section-title-wrap"><h2>Có thể bạn cũng thích</h2><div><button class="related-arrow" onclick="scrollRelatedBooks(-1)">←</button><button class="related-arrow" onclick="scrollRelatedBooks(1)">→</button></div></div><div id="related-books-grid" class="related-books-grid">${renderBookCards(related, false)}</div></section>
     </main>`;
   root.style.display = 'block';
@@ -1437,6 +1437,318 @@ async function openOrderTrackerModal(orderId) {
   } catch (e) {}
 }
 
+async function openOrderDetailModal(orderId) {
+  if (!state.currentUser) {
+    requireLoginForAction('Xem chi tiết đơn hàng');
+    return;
+  }
+
+  try {
+    const order = await apiCall(`/api/orders/${orderId}`);
+    const modal = document.getElementById('order-detail-modal');
+    const headerCode = document.getElementById('order-detail-code-header');
+    const content = document.getElementById('order-detail-content');
+
+    if (headerCode) headerCode.textContent = `#${order.order_code}`;
+
+    let statusBadge = '<span class="badge badge-warning">Chờ đóng gói</span>';
+    if (order.status === 'PENDING') statusBadge = '<span class="badge badge-warning">Đang chờ xử lý</span>';
+    if (order.status === 'PACKING') statusBadge = '<span class="badge badge-info">Đang đóng gói</span>';
+    if (order.status === 'SHIPPING') statusBadge = '<span class="badge badge-info">Đang vận chuyển</span>';
+    if (order.status === 'DELIVERED') statusBadge = '<span class="badge badge-success">Đã giao thành công</span>';
+    if (order.status === 'CANCELLED') statusBadge = '<span class="badge badge-danger">Đã hủy</span>';
+
+    // Shipping progress steps
+    const step = order.tracking_step || 1;
+    const steps = [
+      { num: 1, label: 'Đã Đặt Hàng' },
+      { num: 2, label: 'Đóng Gói' },
+      { num: 3, label: 'Đang Giao' },
+      { num: 4, label: 'Hoàn Tất' }
+    ];
+
+    let stepsHtml = '';
+    steps.forEach(s => {
+      let stepClass = '';
+      if (s.num < step) stepClass = 'done';
+      else if (s.num === step) stepClass = 'active';
+
+      stepsHtml += `
+        <div class="tracking-step-item ${stepClass}">
+          <div class="step-circle">${s.num < step ? '✓' : s.num}</div>
+          <div class="step-label">${s.label}</div>
+        </div>
+      `;
+    });
+
+    // Address text
+    const fullAddress = [
+      order.shipping_street,
+      order.shipping_ward,
+      order.shipping_district,
+      order.shipping_province,
+      order.shipping_address
+    ].filter(Boolean).reduce((acc, curr) => acc.includes(curr) ? acc : [...acc, curr], []).join(', ');
+
+    // Shipping method display text
+    const shippingMethodMap = {
+      'STANDARD': 'Giao tiết kiệm (2-4 ngày)',
+      'EXPRESS': 'Giao nhanh (1-2 ngày)',
+      'SAME_DAY': 'Giao hỏa tốc (Trong ngày)'
+    };
+    const shippingMethodText = shippingMethodMap[order.shipping_method] || order.shipping_method || 'Tiêu chuẩn';
+
+    // Payment status badge
+    const paymentStatusBadge = order.payment_status === 'PAID'
+      ? '<span class="badge badge-success" style="font-size:11px;">Đã thanh toán</span>'
+      : '<span class="badge badge-warning" style="font-size:11px;">Chưa thanh toán</span>';
+
+    // Item rows
+    let itemsHtml = '';
+    if (Array.isArray(order.items)) {
+      order.items.forEach(it => {
+        const shopName = it.seller_shop_name || it.publisher || 'NXB Chính hãng';
+        const escapedShopName = shopName.replace(/'/g, "\\'");
+        itemsHtml += `
+          <div style="display:flex; justify-content:space-between; align-items:center; padding:12px 0; border-bottom:1px solid #f1f5f9;">
+            <div style="display:flex; align-items:center; gap:14px;">
+              <img src="${it.book_cover || 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?auto=format&fit=crop&q=80&w=100'}" style="width:50px; height:68px; object-fit:cover; border-radius:6px; box-shadow:0 1px 3px rgba(0,0,0,0.1); cursor:pointer;" onclick="closeModal('order-detail-modal'); openBookDetailModal(${it.book_id})">
+              <div>
+                <div style="font-weight:700; font-size:14px; color:#1e293b; cursor:pointer;" onclick="closeModal('order-detail-modal'); openBookDetailModal(${it.book_id})">${it.book_title}</div>
+                <div style="font-size:12px; color:#64748b; margin-top:2px;">Đơn giá: ${formatVND(it.price)} x ${it.quantity}</div>
+                <div style="margin-top:6px; display:flex; align-items:center; gap:8px;">
+                  <span style="font-size:12px; color:#475569; font-weight:600;">🏢 ${shopName}</span>
+                  <button class="btn-outline" style="padding:2px 8px; font-size:11px; color:#2563eb; border-color:#93c5fd; background:#eff6ff; border-radius:4px; font-weight:600; cursor:pointer;" onclick="openSellerShopModal(${it.seller_id}, '${escapedShopName}')">
+                    🏪 Xem Shop NXB
+                  </button>
+                </div>
+              </div>
+            </div>
+            <div style="font-weight:700; font-size:14px; color:#1e293b;">${formatVND(it.price * it.quantity)}</div>
+          </div>
+        `;
+      });
+    }
+
+    // Action buttons inside detail modal
+    let confirmReceivedBtn = '';
+    if (order.status === 'PENDING' || order.status === 'PACKING') {
+      confirmReceivedBtn = `<button disabled style="padding:8px 16px; font-size:13px; font-weight:700; background:#cbd5e1; color:#64748b; border:none; border-radius:6px; cursor:not-allowed;" title="Đơn hàng đang chuẩn bị, chưa thể xác nhận nhận hàng">✅ Đã nhận được hàng</button>`;
+    } else if (order.status === 'SHIPPING') {
+      confirmReceivedBtn = `<button class="btn-danger" style="padding:8px 16px; font-size:13px; font-weight:700; background:#ef4444; color:#fff; border:none; border-radius:6px; cursor:pointer;" onclick="handleConfirmOrderReceived(${order.id})">✅ Đã nhận được hàng</button>`;
+    }
+
+    let reviewBtn = '';
+    if (order.status === 'DELIVERED') {
+      reviewBtn = `<button class="btn-preview" style="padding:8px 16px; font-size:13px; font-weight:700;" onclick="closeModal('order-detail-modal'); openOrderReviewModal(${order.id})">⭐ Đánh giá sản phẩm</button>`;
+    }
+
+    let returnBtn = '';
+    if (order.status === 'DELIVERED') {
+      returnBtn = `<button class="btn-secondary" style="padding:8px 16px; font-size:13px; font-weight:700;" onclick="closeModal('order-detail-modal'); openReturnRequestModal(${order.id})">↩️ Yêu cầu trả hàng</button>`;
+    }
+
+    content.innerHTML = `
+      <div style="display:flex; flex-direction:column; gap:18px;">
+        <!-- Header Info -->
+        <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:16px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+          <div>
+            <div style="font-size:13px; color:#64748b;">Mã đơn hàng: <b style="color:#0f172a; font-size:15px;">${order.order_code}</b></div>
+            <div style="font-size:12px; color:#94a3b8; margin-top:4px;">Ngày đặt: ${new Date(order.created_at).toLocaleString('vi-VN')}</div>
+          </div>
+          <div>${statusBadge}</div>
+        </div>
+
+        <!-- Tracking steps -->
+        <div class="tracking-steps" style="margin:6px 0;">
+          ${stepsHtml}
+        </div>
+
+        <!-- Order Items -->
+        <div style="background:#fff; border:1px solid #e2e8f0; border-radius:10px; padding:16px;">
+          <h4 style="margin:0 0 12px; font-size:15px; font-weight:700; color:#0f172a;">📦 Danh sách sản phẩm</h4>
+          ${itemsHtml}
+        </div>
+
+        <!-- Grid 2 columns: Delivery & Payment -->
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:14px;">
+          <!-- Receiver info -->
+          <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:16px;">
+            <h4 style="margin:0 0 10px; font-size:14px; font-weight:700; color:#0f172a;">📍 Địa chỉ giao hàng</h4>
+            <div style="font-size:13px; color:#334155; line-height:1.5;">
+              <div style="font-weight:700;">${order.shipping_name}</div>
+              <div style="color:#64748b;">SĐT: ${order.shipping_phone}</div>
+              <div style="margin-top:4px; color:#475569;">${fullAddress}</div>
+              <div style="margin-top:6px; font-size:12px; color:#2563eb; background:#eff6ff; padding:4px 8px; border-radius:4px; display:inline-block;">
+                Hình thức: ${shippingMethodText}
+              </div>
+            </div>
+          </div>
+
+          <!-- Payment info -->
+          <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:16px;">
+            <h4 style="margin:0 0 10px; font-size:14px; font-weight:700; color:#0f172a;">💳 Thanh toán</h4>
+            <div style="font-size:13px; color:#334155; line-height:1.6;">
+              <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+                <span>Phương thức:</span>
+                <b>${order.payment_method}</b>
+              </div>
+              <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
+                <span>Trạng thái:</span>
+                ${paymentStatusBadge}
+              </div>
+              <div style="border-top:1px dashed #cbd5e1; padding-top:8px; margin-top:8px;">
+                <div style="display:flex; justify-content:space-between; font-size:12px; color:#64748b; margin-top:4px;">
+                  <span>Tạm tính:</span>
+                  <span>${formatVND(order.subtotal_amount || (order.total_amount - (order.shipping_fee || 0) + (order.discount_amount || 0)))}</span>
+                </div>
+                <div style="display:flex; justify-content:space-between; font-size:12px; color:#64748b; margin-top:2px;">
+                  <span>Phí vận chuyển:</span>
+                  <span>${formatVND(order.shipping_fee || 0)}</span>
+                </div>
+                ${order.discount_amount ? `
+                  <div style="display:flex; justify-content:space-between; font-size:12px; color:#16a34a; margin-top:2px;">
+                    <span>Voucher giảm giá (${order.voucher_code || ''}):</span>
+                    <span>-${formatVND(order.discount_amount)}</span>
+                  </div>
+                ` : ''}
+                <div style="display:flex; justify-content:space-between; font-size:14px; font-weight:800; color:#ef4444; margin-top:8px; border-top:1px solid #e2e8f0; padding-top:6px;">
+                  <span>Tổng thanh toán:</span>
+                  <span>${formatVND(order.total_amount)}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Action Footer -->
+        <div style="display:flex; justify-content:flex-end; gap:10px; align-items:center; border-top:1px solid #e2e8f0; padding-top:14px;">
+          <button class="btn-primary" style="padding:8px 16px; font-size:13px;" onclick="openOrderTrackerModal(${order.id})">
+            🚚 Lộ trình vận chuyển
+          </button>
+          ${confirmReceivedBtn}
+          ${reviewBtn}
+          ${returnBtn}
+          <button class="btn-secondary" style="padding:8px 16px; font-size:13px;" onclick="closeModal('order-detail-modal')">Đóng</button>
+        </div>
+      </div>
+    `;
+
+    modal.classList.add('open');
+  } catch (err) {
+    showToast(err.message || 'Không thể xem chi tiết đơn hàng', 'error');
+  }
+}
+
+async function handleConfirmOrderReceived(orderId) {
+  if (!confirm('Bạn xác nhận đã nhận đầy đủ hàng và muốn chuyển sang đánh giá sản phẩm?')) {
+    return;
+  }
+
+  try {
+    await apiCall(`/api/orders/${orderId}/confirm-received`, { method: 'POST' });
+    showToast('Xác nhận đã nhận hàng thành công! Vui lòng viết đánh giá cho các sản phẩm.', 'success');
+
+    // Close detail modal
+    closeModal('order-detail-modal');
+
+    // Reload list if modal is open
+    const myOrdersModal = document.getElementById('my-orders-modal');
+    if (myOrdersModal && myOrdersModal.classList.contains('open')) {
+      openMyOrdersModal();
+    }
+
+    // Open review modal immediately!
+    await openOrderReviewModal(orderId);
+  } catch (err) {
+    showToast(err.message || 'Không thể xác nhận đã nhận hàng.', 'error');
+  }
+}
+
+async function openSellerShopModal(sellerId, shopName) {
+  try {
+    const modal = document.getElementById('seller-shop-modal');
+    const titleEl = document.getElementById('seller-shop-modal-title');
+    const contentEl = document.getElementById('seller-shop-modal-content');
+
+    if (!modal || !contentEl) return;
+
+    const displayShopName = shopName || 'NXB Chính Hãng';
+    if (titleEl) titleEl.textContent = `Gian Hàng: ${displayShopName}`;
+
+    contentEl.innerHTML = `<div style="text-align:center; padding:40px; color:#64748b;">⏳ Đang tải thông tin gian hàng NXB...</div>`;
+    modal.classList.add('open');
+
+    let books = [];
+    try {
+      if (sellerId) {
+        books = await apiCall(`/api/books?seller_id=${sellerId}`);
+      }
+    } catch (err) {}
+
+    // Fallback search by publisher/shop name if no API result
+    if (!books || books.length === 0) {
+      books = (state.books || []).filter(b => 
+        Number(b.seller_id) === Number(sellerId) || 
+        (b.publisher && b.publisher.toLowerCase().includes(displayShopName.toLowerCase())) || 
+        (b.seller_shop_name && b.seller_shop_name.toLowerCase().includes(displayShopName.toLowerCase()))
+      );
+    }
+
+    if (!books || books.length === 0) {
+      contentEl.innerHTML = `
+        <div style="text-align:center; padding:40px 20px; color:#94a3b8;">
+          <div style="font-size:48px; margin-bottom:12px;">🏢</div>
+          <h4 style="margin:0 0 6px; color:#475569; font-size:16px;">Gian hàng: ${displayShopName}</h4>
+          <p style="margin:0; font-size:13px; color:#64748b;">Hiện chưa có sách bán công khai khác từ gian hàng này.</p>
+        </div>
+      `;
+      return;
+    }
+
+    let booksCardsHtml = books.map(b => {
+      const price = b.discount_price || b.price;
+      return `
+        <div style="background:#fff; border:1px solid #e2e8f0; border-radius:10px; padding:12px; display:flex; flex-direction:column; justify-content:space-between; transition:all 0.2s;" onmouseover="this.style.borderColor='#3b82f6'; this.style.boxShadow='0 4px 10px rgba(0,0,0,0.08)'" onmouseout="this.style.borderColor='#e2e8f0'; this.style.boxShadow='none'">
+          <div>
+            <div style="position:relative; width:100%; height:160px; overflow:hidden; border-radius:6px; margin-bottom:10px; background:#f1f5f9; cursor:pointer;" onclick="closeModal('seller-shop-modal'); openBookDetailModal(${b.id})">
+              <img src="${b.cover_image || 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?auto=format&fit=crop&q=80&w=200'}" style="width:100%; height:100%; object-fit:cover;">
+            </div>
+            <div style="font-weight:700; font-size:14px; color:#1e293b; line-height:1.3; margin-bottom:4px; cursor:pointer;" onclick="closeModal('seller-shop-modal'); openBookDetailModal(${b.id})">
+              ${b.title}
+            </div>
+            <div style="font-size:12px; color:#64748b; margin-bottom:8px;">Tác giả: ${b.author || 'Nhiều tác giả'}</div>
+          </div>
+          <div>
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+              <span style="font-weight:800; font-size:15px; color:#ef4444;">${formatVND(price)}</span>
+              ${b.discount_price ? `<span style="font-size:11px; text-decoration:line-through; color:#94a3b8;">${formatVND(b.price)}</span>` : ''}
+            </div>
+            <div style="display:flex; gap:6px;">
+              <button class="btn-outline" style="flex:1; padding:6px 8px; font-size:12px;" onclick="closeModal('seller-shop-modal'); openBookDetailModal(${b.id})">📄 Chi tiết</button>
+              <button class="btn-primary" style="padding:6px 10px; font-size:12px;" onclick="addToCart(${b.id}, 1)">🛒 Thêm</button>
+            </div>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    contentEl.innerHTML = `
+      <div style="margin-bottom:16px; display:flex; justify-content:space-between; align-items:center; background:#f8fafc; padding:12px 16px; border-radius:8px; border:1px solid #e2e8f0;">
+        <div>
+          <span style="font-weight:700; font-size:15px; color:#0f172a;">📚 Tủ sách bán tại gian hàng: ${displayShopName}</span>
+          <div style="font-size:12px; color:#64748b; margin-top:2px;">Tổng cộng ${books.length} tác phẩm sách chính hãng</div>
+        </div>
+      </div>
+      <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap:14px;">
+        ${booksCardsHtml}
+      </div>
+    `;
+  } catch (err) {
+    showToast(err.message || 'Không thể mở gian hàng NXB.', 'error');
+  }
+}
+
 async function openMyOrdersModal() {
   if (!state.currentUser) {
     requireLoginForAction('Xem lịch sử đơn hàng');
@@ -1454,32 +1766,25 @@ async function openMyOrdersModal() {
       let html = '';
       orders.forEach(o => {
         let statusBadge = '<span class="badge badge-warning">Chờ đóng gói</span>';
+        if (o.status === 'PENDING') statusBadge = '<span class="badge badge-warning">Đang chờ xử lý</span>';
         if (o.status === 'PACKING') statusBadge = '<span class="badge badge-info">Đang đóng gói</span>';
-        if (o.status === 'SHIPPING') statusBadge = '<span class="badge badge-info">Đang giao hàng</span>';
+        if (o.status === 'SHIPPING') statusBadge = '<span class="badge badge-info">Đang vận chuyển</span>';
         if (o.status === 'DELIVERED') statusBadge = '<span class="badge badge-success">Đã giao thành công</span>';
-
-        const returnButton = o.status === 'DELIVERED'
-          ? `<button class="btn-secondary" style="padding:4px 10px; font-size:12px; margin-left:8px;" onclick="closeModal('my-orders-modal'); openReturnRequestModal(${o.id})">↩️ Yêu cầu trả hàng</button>`
-          : '';
-        const reviewButton = o.status === 'DELIVERED'
-          ? `<button class="btn-preview" style="padding:4px 10px; font-size:12px;" onclick="closeModal('my-orders-modal'); openOrderReviewModal(${o.id})">⭐ Đánh giá sản phẩm</button>`
-          : '';
+        if (o.status === 'CANCELLED') statusBadge = '<span class="badge badge-danger">Đã hủy</span>';
 
         html += `
-          <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:16px; margin-bottom:12px;">
-            <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
-              <span style="font-weight:800;">Mã đơn: ${o.order_code}</span>
+          <div onclick="openOrderDetailModal(${o.id})" style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:16px; margin-bottom:12px; cursor:pointer; transition:all 0.2s;" onmouseover="this.style.borderColor='#3b82f6'; this.style.boxShadow='0 4px 6px -1px rgba(0,0,0,0.1)'" onmouseout="this.style.borderColor='#e2e8f0'; this.style.boxShadow='none'">
+            <div style="display:flex; justify-content:space-between; margin-bottom:8px; align-items:center;">
+              <span style="font-weight:800; color:#1e293b;" onclick="event.stopPropagation(); openOrderDetailModal(${o.id})">Mã đơn: <u style="color:#2563eb; cursor:pointer;">${o.order_code}</u></span>
               ${statusBadge}
             </div>
-            <div style="font-size:13px; color:#64748b; margin-bottom:8px;">
-              Tổng tiền: <b style="color:#ef4444;">${formatVND(o.total_amount)}</b> | ${new Date(o.created_at).toLocaleDateString('vi-VN')}
+            <div style="font-size:13px; color:#64748b; margin-bottom:10px;">
+              Tổng tiền: <b style="color:#ef4444;">${formatVND(o.total_amount)}</b> | Ngày đặt: ${new Date(o.created_at).toLocaleDateString('vi-VN')}
             </div>
-            <div style="display:flex; gap:8px; flex-wrap:wrap;">
-              <button class="btn-primary" style="padding:4px 10px; font-size:12px;" onclick="closeModal('my-orders-modal'); openOrderTrackerModal(${o.id})">
-                🚚 Xem lộ trình vận chuyển
+            <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+              <button class="btn-primary" style="padding:6px 14px; font-size:12px;" onclick="event.stopPropagation(); openOrderDetailModal(${o.id})">
+                📄 Chi tiết đơn hàng
               </button>
-              ${reviewButton}
-              ${returnButton}
             </div>
           </div>
         `;
@@ -1489,6 +1794,141 @@ async function openMyOrdersModal() {
 
     modal.classList.add('open');
   } catch (e) {}
+}
+
+async function handleWriteReviewForBook(bookId) {
+  if (!state.currentUser) {
+    showAuthPage();
+    switchAuthTab('login');
+    showToast('Vui lòng đăng nhập để viết đánh giá sản phẩm.', 'warning');
+    return;
+  }
+
+  try {
+    const orders = await apiCall('/api/orders/my-orders');
+    // Tìm đơn hàng đã giao thành công có chứa sản phẩm bookId
+    let targetOrder = null;
+    let targetItem = null;
+
+    for (const o of orders) {
+      if (o.status === 'DELIVERED' && Array.isArray(o.items)) {
+        const item = o.items.find(i => Number(i.book_id) === Number(bookId));
+        if (item) {
+          targetOrder = o;
+          targetItem = item;
+          break;
+        }
+      }
+    }
+
+    if (targetOrder && targetItem) {
+      openSingleBookReviewModal(targetOrder, targetItem);
+    } else {
+      const pendingOrder = orders.find(o => o.status !== 'DELIVERED' && Array.isArray(o.items) && o.items.some(i => Number(i.book_id) === Number(bookId)));
+      if (pendingOrder) {
+        showToast('Đơn hàng của bạn đang được vận chuyển. Bạn có thể đánh giá sau khi nhận sách thành công.', 'warning');
+      } else {
+        showToast('Bạn cần đặt mua và nhận sách thành công để có thể viết đánh giá.', 'warning');
+      }
+    }
+  } catch (err) {
+    showToast(err.message || 'Không thể kiểm tra trạng thái mua hàng.', 'error');
+  }
+}
+
+function openSingleBookReviewModal(order, item) {
+  const formRoot = document.getElementById('review-form-root');
+  if (!formRoot) return;
+  formRoot.innerHTML = `
+    <div style="display:flex; flex-direction:column; gap:16px;">
+      <div>
+        <h4 style="margin:0 0 6px; font-size:16px;">Đánh giá sách: ${item.book_title}</h4>
+        <p style="margin:0; color:#64748b; font-size:13px;">Mã đơn hàng: <b>${order.order_code}</b> · Đã giao thành công</p>
+      </div>
+      <div data-review-item="${item.id}" data-selected-rating="5" style="padding:16px; border:1px solid #e2e8f0; border-radius:10px; background:#f8fafc; display:flex; gap:14px; align-items:flex-start;">
+        <img src="${item.book_cover || 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?auto=format&fit=crop&q=80&w=80'}" style="width:64px; height:84px; object-fit:cover; border-radius:8px; box-shadow:0 2px 6px rgba(0,0,0,0.1);">
+        <div style="flex:1; min-width:0;">
+          <div style="font-weight:700; font-size:15px; margin-bottom:8px; color:#1e293b;">${item.book_title}</div>
+          <div style="margin-bottom:10px;">
+            <label style="display:block; font-weight:600; font-size:13px; margin-bottom:4px; color:#475569;">Mức độ hài lòng của bạn:</label>
+            <div class="review-stars-interactive" style="display:flex; gap:6px; align-items:center;">
+              ${[1, 2, 3, 4, 5].map(star => `
+                <label style="cursor:pointer; font-size:26px; user-select:none;"
+                       onclick="highlightInteractiveStars(${item.id}, ${star})"
+                       onmouseover="previewInteractiveStars(${item.id}, ${star})"
+                       onmouseout="resetInteractiveStars(${item.id})">
+                  <input type="radio" id="star-radio-${item.id}-${star}" name="rating-${item.id}" value="${star}" style="display:none;" ${star === 5 ? 'checked' : ''}>
+                  <span id="star-icon-${item.id}-${star}" style="color:#fbbf24; transition:color 0.15s;">★</span>
+                </label>
+              `).join('')}
+              <span id="star-label-${item.id}" style="margin-left:8px; font-size:13px; font-weight:600; color:#b45309;">Tuyệt vời (5/5)</span>
+            </div>
+          </div>
+          <div style="margin-bottom:10px;">
+            <label style="display:block; font-weight:600; font-size:13px; margin-bottom:4px; color:#475569;">Nhận xét chi tiết:</label>
+            <textarea rows="3" placeholder="Chia sẻ cảm nhận về chất lượng in ấn, nội dung sách, dịch vụ đóng gói..." style="width:100%; resize:vertical; border:1px solid #cbd5e1; border-radius:8px; padding:10px 12px; font-size:13px; font-family:inherit;" data-review-content="${item.id}"></textarea>
+          </div>
+          <div style="margin-bottom:12px;">
+            <label style="display:block; font-weight:600; font-size:13px; margin-bottom:4px; color:#475569;">Ảnh minh họa (tùy chọn):</label>
+            <input type="text" placeholder="Dán link ảnh chụp thực tế (https://...)" style="width:100%; border:1px solid #cbd5e1; border-radius:8px; padding:8px 10px; font-size:13px;" data-review-image="${item.id}">
+          </div>
+          <div style="display:flex; justify-content:flex-end; gap:8px;">
+            <button class="btn-secondary" style="padding:8px 16px; font-size:13px;" onclick="closeModal('review-modal')">Hủy</button>
+            <button class="btn-primary" style="padding:8px 18px; font-size:13px; font-weight:700;" onclick="submitReviewItem(${order.id}, ${item.id}, ${item.book_id})">🚀 Gửi Đánh Giá Ngay</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+  document.getElementById('review-modal').classList.add('open');
+}
+
+function highlightInteractiveStars(itemId, selectedStar) {
+  const container = document.querySelector(`[data-review-item="${itemId}"]`);
+  if (container) {
+    container.dataset.selectedRating = selectedStar;
+  }
+  updateStarDisplay(itemId, selectedStar);
+}
+
+function previewInteractiveStars(itemId, hoverStar) {
+  updateStarDisplay(itemId, hoverStar);
+}
+
+function resetInteractiveStars(itemId) {
+  const container = document.querySelector(`[data-review-item="${itemId}"]`);
+  const selectedStar = container && container.dataset.selectedRating ? Number(container.dataset.selectedRating) : 5;
+  updateStarDisplay(itemId, selectedStar);
+}
+
+function updateStarDisplay(itemId, activeStar) {
+  const labels = {
+    1: 'Rất tệ (1/5)',
+    2: 'Tệ (2/5)',
+    3: 'Bình thường (3/5)',
+    4: 'Hài lòng (4/5)',
+    5: 'Tuyệt vời (5/5)'
+  };
+  for (let s = 1; s <= 5; s++) {
+    const icon = document.getElementById(`star-icon-${itemId}-${s}`);
+    const radio = document.getElementById(`star-radio-${itemId}-${s}`);
+    if (icon) {
+      if (s <= activeStar) {
+        icon.textContent = '★';
+        icon.style.color = '#fbbf24';
+      } else {
+        icon.textContent = '☆';
+        icon.style.color = '#cbd5e1';
+      }
+    }
+    if (radio && s === activeStar) {
+      radio.checked = true;
+    }
+  }
+  const labelEl = document.getElementById(`star-label-${itemId}`);
+  if (labelEl) {
+    labelEl.textContent = labels[activeStar] || `${activeStar}/5`;
+  }
 }
 
 async function openOrderReviewModal(orderId) {
@@ -1505,20 +1945,34 @@ async function openOrderReviewModal(orderId) {
       <div style="display:flex; flex-direction:column; gap:16px;">
         <div>
           <h4 style="margin:0 0 6px; font-size:16px;">Đơn hàng: ${order.order_code}</h4>
-          <p style="margin:0; color:#64748b; font-size:13px;">Mỗi sản phẩm chỉ được đánh giá một lần. Bạn có thể thêm ảnh minh họa nếu muốn.</p>
+          <p style="margin:0; color:#64748b; font-size:13px;">Mỗi sản phẩm chỉ được đánh giá một lần. Bạn có thể chọn số sao và nhận xét chi tiết.</p>
         </div>
         ${order.items.map(item => `
-          <div data-review-item="${item.id}" style="padding:12px; border:1px solid #e2e8f0; border-radius:10px; background:#f8fafc; display:flex; gap:12px; align-items:flex-start;">
-            <img src="${item.book_cover || 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?auto=format&fit=crop&q=80&w=80'}" style="width:56px; height:72px; object-fit:cover; border-radius:8px;">
+          <div data-review-item="${item.id}" data-selected-rating="5" style="padding:14px; border:1px solid #e2e8f0; border-radius:10px; background:#f8fafc; display:flex; gap:14px; align-items:flex-start;">
+            <img src="${item.book_cover || 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?auto=format&fit=crop&q=80&w=80'}" style="width:60px; height:80px; object-fit:cover; border-radius:8px; box-shadow:0 1px 3px rgba(0,0,0,0.1);">
             <div style="flex:1; min-width:0;">
-              <div style="font-weight:700; margin-bottom:8px;">${item.book_title}</div>
-              <div class="review-stars" style="margin-bottom:8px;">
-                ${[5,4,3,2,1].map(star => `<label style="cursor:pointer; color:#fbbf24; font-size:18px; margin-right:4px;"><input type="radio" name="rating-${item.id}" value="${star}" style="display:none;">★</label>`).join('')}
+              <div style="font-weight:700; font-size:15px; margin-bottom:8px; color:#1e293b;">${item.book_title}</div>
+              
+              <div style="margin-bottom:10px;">
+                <label style="display:block; font-weight:600; font-size:13px; margin-bottom:4px; color:#475569;">Đánh giá của bạn:</label>
+                <div class="review-stars-interactive" style="display:flex; gap:6px; align-items:center;">
+                  ${[1, 2, 3, 4, 5].map(star => `
+                    <label style="cursor:pointer; font-size:24px; user-select:none;"
+                           onclick="highlightInteractiveStars(${item.id}, ${star})"
+                           onmouseover="previewInteractiveStars(${item.id}, ${star})"
+                           onmouseout="resetInteractiveStars(${item.id})">
+                      <input type="radio" id="star-radio-${item.id}-${star}" name="rating-${item.id}" value="${star}" style="display:none;" ${star === 5 ? 'checked' : ''}>
+                      <span id="star-icon-${item.id}-${star}" style="color:#fbbf24; transition:color 0.15s;">★</span>
+                    </label>
+                  `).join('')}
+                  <span id="star-label-${item.id}" style="margin-left:8px; font-size:13px; font-weight:600; color:#b45309;">Tuyệt vời (5/5)</span>
+                </div>
               </div>
-              <textarea rows="3" placeholder="Viết nhận xét của bạn về sản phẩm..." style="width:100%; resize:vertical; border:1px solid #cbd5e1; border-radius:8px; padding:10px 12px; font-size:13px;" data-review-content="${item.id}"></textarea>
+
+              <textarea rows="3" placeholder="Viết nhận xét của bạn về sản phẩm..." style="width:100%; resize:vertical; border:1px solid #cbd5e1; border-radius:8px; padding:10px 12px; font-size:13px; font-family:inherit;" data-review-content="${item.id}"></textarea>
               <input type="text" placeholder="URL ảnh minh họa (tuỳ chọn)" style="width:100%; margin-top:8px; border:1px solid #cbd5e1; border-radius:8px; padding:8px 10px; font-size:13px;" data-review-image="${item.id}">
-              <div style="display:flex; justify-content:flex-end; margin-top:10px;">
-                <button class="btn-primary" style="padding:6px 12px; font-size:12px;" onclick="submitReviewItem(${order.id}, ${item.id}, ${item.book_id})">Gửi đánh giá</button>
+              <div style="display:flex; justify-content:flex-end; margin-top:12px;">
+                <button class="btn-primary" style="padding:7px 16px; font-size:13px; font-weight:700;" onclick="submitReviewItem(${order.id}, ${item.id}, ${item.book_id})">🚀 Gửi Đánh Giá</button>
               </div>
             </div>
           </div>
@@ -1537,7 +1991,7 @@ async function submitReviewItem(orderId, orderItemId, productId) {
   const checked = itemRoot.querySelector('input[name="rating-' + orderItemId + '"]:checked');
   const content = itemRoot.querySelector('[data-review-content="' + orderItemId + '"]').value.trim();
   const imageInput = itemRoot.querySelector('[data-review-image="' + orderItemId + '"]');
-  const rating = Number(checked?.value || 0);
+  const rating = Number(checked?.value || itemRoot.dataset.selectedRating || 5);
   if (!rating) {
     showToast('Vui lòng chọn số sao trước khi gửi đánh giá.', 'warning');
     return;
@@ -1558,7 +2012,9 @@ async function submitReviewItem(orderId, orderItemId, productId) {
     await apiCall('/api/reviews', { method: 'POST', body: JSON.stringify(body) });
     showToast('Đánh giá của bạn đã được gửi thành công.', 'success');
     closeModal('review-modal');
-    await openMyOrdersModal();
+    if (document.getElementById('my-orders-modal')?.classList.contains('open')) {
+      await openMyOrdersModal();
+    }
     if (state.currentUser && state.currentPortal !== 'SELLER') {
       const book = state.books.find(item => item.id === Number(productId));
       if (book) await loadBookReviews(book.id);

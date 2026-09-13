@@ -5,6 +5,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 import models, auth
+import notification_service
 from database import get_db
 
 router = APIRouter(prefix="/api", tags=["Reviews"])
@@ -138,6 +139,19 @@ def create_review(
     db.commit()
     db.refresh(review)
     _refresh_product_rating(db, product.id)
+
+    # 📲 Gửi thông báo đánh giá đơn hàng cho Khách hàng & NXB
+    try:
+        notification_service.notify_order_reviewed(
+            db=db,
+            order=order,
+            review=review,
+            buyer=current_user,
+            seller_id=product.seller_id
+        )
+    except Exception:
+        pass  # Không để lỗi thông báo ảnh hưởng tới kết quả tạo đánh giá
+
     return _serialize_review(db, review)
 
 

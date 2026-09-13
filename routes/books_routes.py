@@ -29,6 +29,7 @@ def list_public_sellers(db: Session = Depends(get_db)):
 def list_books(
     q: Optional[str] = Query(None, description="Tìm theo tên sách hoặc tác giả"),
     category_id: Optional[int] = Query(None, description="Lọc theo mã thể loại"),
+    seller_id: Optional[int] = Query(None, description="Lọc theo nhà bán hàng / NXB"),
     is_featured: Optional[bool] = Query(None, description="Lọc sách có quảng cáo"),
     limit: int = 50,
     db: Session = Depends(get_db)
@@ -47,6 +48,9 @@ def list_books(
     
     if category_id:
         query = query.filter(models.Book.category_id == category_id)
+
+    if seller_id:
+        query = query.filter(models.Book.seller_id == seller_id)
         
     if is_featured is not None:
         query = query.filter(models.Book.is_featured_ad == is_featured)

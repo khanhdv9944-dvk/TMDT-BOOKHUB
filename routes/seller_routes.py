@@ -372,6 +372,21 @@ def update_order_status(
 
     db.commit()
     db.refresh(order)
+
+    # 📲 Gửi thông báo theo trạng thái đơn hàng
+    try:
+        if order.status == models.OrderStatus.PACKING.value:
+            # 📦 Giai đoạn 1: NXB bấm "Xác nhận & Đóng gói"
+            notification_service.notify_order_packing(db, order)
+        elif order.status == models.OrderStatus.SHIPPING.value:
+            # 🚚 Giai đoạn 2: NXB bàn giao cho đơn vị vận chuyển
+            notification_service.notify_order_shipping(db, order, carrier, tracking_code)
+        elif order.status == models.OrderStatus.DELIVERED.value:
+            # ✅ Giai đoạn 3: Xác nhận giao hàng thành công
+            notification_service.notify_order_delivered(db, order)
+    except Exception:
+        pass  # Không để lỗi thông báo ảnh hưởng tới luồng cập nhật đơn hàng
+
     return {
         "message": f"Cập nhật đơn hàng thành công: {order.status}",
         "status": order.status,

@@ -351,6 +351,8 @@ class OrderItemOut(BaseModel):
     book_cover: Optional[str]
     quantity: int
     price: float
+    seller_shop_name: Optional[str] = None
+    publisher: Optional[str] = None
 
     class Config:
         from_attributes = True

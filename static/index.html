@@ -1623,6 +1623,40 @@
     </div>
   </div>
 
+  <!-- Modal Chi Tiết Đơn Hàng -->
+  <div id="order-detail-modal" class="modal-overlay">
+    <div class="modal-box" style="max-width: 760px;">
+      <div class="modal-header">
+        <h3 class="modal-title">📄 Chi Tiết Đơn Hàng <span id="order-detail-code-header" style="color:var(--primary); font-size:16px; font-weight:700;"></span></h3>
+        <button class="close-modal-btn" onclick="closeModal('order-detail-modal')">✕</button>
+      </div>
+      <div class="modal-body" id="order-detail-content">
+        <!-- JS sẽ render nội dung chi tiết ở đây -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Gian Hàng NXB / Seller Shop -->
+  <div id="seller-shop-modal" class="modal-overlay">
+    <div class="modal-box" style="max-width: 920px;">
+      <div class="modal-header" style="background: linear-gradient(135deg, #1e293b 0%, #334155 100%); color: #fff; padding: 16px 20px; border-radius: 12px 12px 0 0;">
+        <div style="display:flex; align-items:center; gap:12px;">
+          <div style="width:40px; height:40px; border-radius:50%; background:#3b82f6; display:flex; align-items:center; justify-content:center; font-size:20px; color:#fff;">🏢</div>
+          <div>
+            <h3 class="modal-title" id="seller-shop-modal-title" style="color:#fff; margin:0; font-size:17px; font-weight:700;">Gian Hàng NXB</h3>
+            <span style="font-size:12px; color:#38bdf8; display:inline-block; margin-top:2px;">✔ Nhà Xuất Bản / Gian Hàng Chính Hãng</span>
+          </div>
+        </div>
+        <button class="close-modal-btn" onclick="closeModal('seller-shop-modal')" style="color:#fff;">✕</button>
+      </div>
+      <div class="modal-body" style="padding: 20px;">
+        <div id="seller-shop-modal-content">
+          <!-- JS sẽ render sản phẩm của NXB ở đây -->
+        </div>
+      </div>
+    </div>
+  </div>
+
   <div id="return-request-modal" class="modal-overlay">
     <div class="modal-box" style="max-width: 620px;">
       <div class="modal-header">

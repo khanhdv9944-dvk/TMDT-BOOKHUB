@@ -40,6 +40,12 @@ class NotificationType(str, enum.Enum):
     NEW_BOOK_SUBMITTED = "NEW_BOOK_SUBMITTED"
     BOOK_APPROVED = "BOOK_APPROVED"
     BOOK_REJECTED = "BOOK_REJECTED"
+    ORDER_CREATED = "ORDER_CREATED"
+    ORDER_PACKING = "ORDER_PACKING"
+    ORDER_SHIPPING = "ORDER_SHIPPING"
+    ORDER_OUT_FOR_DELIVERY = "ORDER_OUT_FOR_DELIVERY"
+    ORDER_DELIVERED = "ORDER_DELIVERED"
+    ORDER_REVIEWED = "ORDER_REVIEWED"
 
 class ReturnRequestStatus(str, enum.Enum):
     PENDING = "PENDING"
@@ -255,8 +261,24 @@ class OrderItem(Base):
     order = relationship("Order", back_populates="items")
     book = relationship("Book", back_populates="order_items")
     seller = relationship("User", foreign_keys=[seller_id])
-    return_items = relationship("ReturnRequestItem", foreign_keys="ReturnRequestItem.order_item_id")
+    return_items = relationship("ReturnRequestItem", back_populates="order_item", foreign_keys="ReturnRequestItem.order_item_id")
     reviews = relationship("Review", back_populates="order_item", foreign_keys="Review.order_item_id")
+
+    @property
+    def seller_shop_name(self):
+        if self.seller and (self.seller.shop_name or self.seller.full_name):
+            return self.seller.shop_name or self.seller.full_name
+        if self.book and self.book.publisher:
+            return self.book.publisher
+        return "NXB Chính hãng"
+
+    @property
+    def publisher(self):
+        if self.book and self.book.publisher:
+            return self.book.publisher
+        if self.seller and (self.seller.shop_name or self.seller.full_name):
+            return self.seller.shop_name or self.seller.full_name
+        return "NXB Chính hãng"
 
 class Review(Base):
     __tablename__ = "reviews"
@@ -342,7 +364,7 @@ class ReturnRequestItem(Base):
     product_name = Column(String(255), nullable=True)
 
     return_request = relationship("ReturnRequest", back_populates="items")
-    order_item = relationship("OrderItem", foreign_keys=[order_item_id])
+    order_item = relationship("OrderItem", back_populates="return_items", foreign_keys=[order_item_id])
     product = relationship("Book", foreign_keys=[product_id])
 
 class Address(Base):
@@ -540,4 +562,6 @@ class Notification(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
     user = relationship("User", backref="notifications")
+
+
 
