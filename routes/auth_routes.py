@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta
+import os
 from pathlib import Path
 from uuid import uuid4
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form
@@ -7,7 +8,11 @@ from database import get_db
 import models, schemas, auth
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-DOCUMENT_STORAGE_DIR = BASE_DIR / "uploads" / "documents"
+DOCUMENT_STORAGE_DIR = (
+    Path("/tmp") / "uploads" / "documents"
+    if os.getenv("VERCEL")
+    else BASE_DIR / "uploads" / "documents"
+)
 DOCUMENT_STORAGE_DIR.mkdir(parents=True, exist_ok=True)
 
 router = APIRouter(prefix="/api/auth", tags=["Authentication"])
