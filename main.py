@@ -19,10 +19,25 @@ from seed_data import seed_database
 BASE_DIR = Path(__file__).resolve().parent
 STATIC_DIR = BASE_DIR / "static"
 
-# Khởi tạo Database & Seed Data
-Base.metadata.create_all(bind=engine)
-migrate_schema()
-seed_database()
+# Khởi tạo Database & Seed Data một lần duy nhất
+_db_initialized = False
+
+def initialize_database():
+    global _db_initialized
+    if _db_initialized:
+        return
+    try:
+        Base.metadata.create_all(bind=engine)
+        migrate_schema()
+        seed_database()
+        _db_initialized = True
+    except Exception as e:
+        print(f"Database initialization error: {e}")
+        _db_initialized = True  # Đánh dấu đã try, tránh loop
+
+# Khởi tạo DB ngay trên startup nếu không phải Vercel
+if not os.getenv("VERCEL"):
+    initialize_database()
 
 app = FastAPI(
     title="BookHub - Sàn TMĐT Sách Đa Vai Trò",
@@ -38,6 +53,17 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Startup event - khởi tạo DB một lần trên Vercel
+@app.on_event("startup")
+async def startup_event():
+    if os.getenv("VERCEL"):
+        initialize_database()
+
+# Health check endpoint
+@app.get("/health", include_in_schema=False)
+async def health_check():
+    return {"status": "ok", "environment": os.getenv("VERCEL", "local")}
 
 # Đăng ký các Router API
 app.include_router(auth_router)
