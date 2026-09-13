@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 from database import get_db
 import models, schemas, auth
+from financial import COMMISSION_RATE, calculate_commission
 
 router = APIRouter(prefix="/api/seller", tags=["Seller Portal"])
 
@@ -27,8 +28,8 @@ def get_seller_dashboard(
     for item in order_items:
         total_revenue_gross += (item.price * item.quantity)
     
-    # Hoa hồng sàn khấu trừ 10%
-    platform_commission = total_revenue_gross * 0.10
+    # Hoa hồng sàn dùng chung tỷ lệ 5%.
+    platform_commission = calculate_commission(total_revenue_gross, COMMISSION_RATE)
     net_earnings = total_revenue_gross - platform_commission
 
     total_books = db.query(models.Book).filter(models.Book.seller_id == current_user.id).count()
@@ -292,7 +293,7 @@ def get_seller_orders(
     for o in orders:
         seller_items = [i for i in o.items if i.seller_id == current_user.id]
         seller_total = sum(i.price * i.quantity for i in seller_items)
-        seller_fee = seller_total * 0.10
+        seller_fee = calculate_commission(seller_total, COMMISSION_RATE)
         seller_net = seller_total - seller_fee
 
         results.append({

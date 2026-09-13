@@ -9,6 +9,7 @@ from sqlalchemy import func, desc
 from database import get_db
 import models, schemas, auth
 import notification_service
+from financial import COMMISSION_RATE_PERCENT, calculate_commission, order_net_gmv
 
 router = APIRouter(prefix="/api/admin", tags=["Admin Portal"])
 
@@ -17,22 +18,30 @@ def get_platform_financial_overview(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth.require_role([models.UserRole.ADMIN.value]))
 ):
-    """Báo cáo 3 nguồn tạo ra tiền của Sàn TMĐT Sách"""
-    
-    # Marketplace metrics: GMV is merchandise value, platform revenue is the
-    # money retained by the platform. Shipping is not part of GMV.
-    valid_orders = db.query(models.Order).filter(
-        models.Order.status != models.OrderStatus.CANCELLED.value
-    )
-    total_gmv = db.query(func.sum(models.Order.subtotal_amount)).filter(
-        models.Order.status != models.OrderStatus.CANCELLED.value
-    ).scalar() or 0.0
-    if total_gmv == 0:
-        total_gmv = valid_orders.with_entities(func.sum(models.Order.total_amount)).scalar() or 0.0
+    """Báo cáo GMV và phí hoa hồng thực tế từ các đơn hàng hợp lệ."""
+    orders = db.query(models.Order).all()
+    refunded_by_order = {}
+    refunded_requests = db.query(models.ReturnRequest).filter(
+        models.ReturnRequest.status == models.ReturnRequestStatus.REFUNDED.value
+    ).all()
+    for request in refunded_requests:
+        refunded_by_order[request.order_id] = refunded_by_order.get(request.order_id, 0.0) + (request.refund_amount or 0.0)
 
-    # 1. Doanh thu từ Phí Hoa Hồng dịch vụ (Take rate 10% từ các đơn)
-    total_commission_earned = db.query(func.sum(models.Order.platform_fee_amount)).scalar() or 0.0
-    total_orders = valid_orders.count()
+    order_values = [
+        order_net_gmv(
+            {"status": order.status, "subtotal_amount": order.subtotal_amount, "total_amount": order.total_amount},
+            refunded_by_order.get(order.id, 0.0),
+        )
+        for order in orders
+    ]
+    total_gmv = sum(order_values)
+    total_commission_earned = sum(calculate_commission(value) for value in order_values)
+    total_orders = sum(1 for value in order_values if value > 0)
+    successful_orders = sum(1 for order, value in zip(orders, order_values) if order.status == models.OrderStatus.DELIVERED.value and value > 0)
+    cancelled_orders = sum(1 for order in orders if str(order.status).upper() in {"CANCELLED", "CANCELED"})
+    refunded_orders = sum(1 for order in orders if refunded_by_order.get(order.id, 0.0) > 0)
+    returned_orders = db.query(models.Order).filter(models.Order.return_status != "NONE").count()
+    total_refunds = sum(refunded_by_order.values())
 
     # 2. Doanh thu từ Quảng Cáo vị trí nổi bật (Ads Revenue)
     total_ad_revenue = db.query(func.sum(models.AdCampaign.fee_paid)).scalar() or 0.0
@@ -42,7 +51,8 @@ def get_platform_financial_overview(
     total_vip_revenue = db.query(func.sum(models.VipSubscription.price)).scalar() or 0.0
     total_vip_members = db.query(models.VipSubscription).count()
 
-    total_platform_revenue = total_commission_earned + total_ad_revenue + total_vip_revenue
+    # This metric is intentionally commission-only. Ads and VIP are separate streams.
+    total_platform_revenue = total_commission_earned
 
     # Thống kê tổng số lượng thực thể
     total_users = db.query(models.User).count()
@@ -70,11 +80,11 @@ def get_platform_financial_overview(
             "total_gmv_gross": total_gmv,
             "revenue_streams": [
                 {
-                    "name": "Phí hoa hồng dịch vụ bán sách (10%)",
+                    "name": f"Phí hoa hồng dịch vụ bán sách ({COMMISSION_RATE_PERCENT:.0f}%)",
                     "code": "COMMISSION_FEE",
                     "amount": total_commission_earned,
                     "percent_share": round((total_commission_earned / total_platform_revenue * 100), 1) if total_platform_revenue > 0 else 0,
-                    "description": "Thu tự động 10% trên mỗi cuốn sách giao dịch thành công"
+                    "description": "Phí hoa hồng thực tế trên đơn hàng hợp lệ"
                 },
                 {
                     "name": "Doanh thu Quảng cáo vị trí Top (Book Ads)",
@@ -94,6 +104,11 @@ def get_platform_financial_overview(
         },
         "stats": {
             "total_orders": total_orders,
+            "successful_orders": successful_orders,
+            "cancelled_orders": cancelled_orders,
+            "returned_orders": returned_orders,
+            "refunded_orders": refunded_orders,
+            "total_refunds": total_refunds,
             "total_users": total_users,
             "total_sellers": total_sellers,
             "pending_sellers": pending_sellers,

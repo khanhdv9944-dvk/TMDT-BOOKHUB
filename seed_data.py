@@ -15,7 +15,7 @@ import models, auth
 REFERENCE_CATALOG = [
     {"title": "Từ Sách Tâm Linh Thế Kỷ - Bốn Cấp Độ Chữa Lành", "author": "Nhiều tác giả", "publisher": "NXB Thế Giới", "price": 65000, "discount_price": 52000, "category": "ky-nang", "stock": 32, "sold_count": 122, "rating": 4.7, "cover_image": "https://images.unsplash.com/photo-1543002588-bfa74002ed7e?auto=format&fit=crop&q=80&w=500", "format": "PAPER"},
     {"title": "Vị Phật Ở Chung Nhà", "author": "Thích Nhất Hạnh", "publisher": "NXB Kim Đồng", "price": 128000, "discount_price": 104000, "category": "ky-nang", "stock": 28, "sold_count": 88, "rating": 4.8, "cover_image": "https://images.unsplash.com/photo-1507842217343-583bb7270b66?auto=format&fit=crop&q=80&w=500", "format": "PAPER"},
-    {"title": "Chuẩn Bị Cho Bé Vào Lớp 1 - Luyện Viết Chữ Đẹp Tập 2", "author": "Ban biên soạn", "publisher": "NXB Giáo Dục", "price": 17000, "discount_price": 14000, "category": "thieu-nhi", "stock": 45, "sold_count": 210, "rating": 4.8, "cover_image": "https://images.unsplash.com/photo-1544717305-2782549b5136?auto=format&fit=crop&q=80&w=500", "format": "PAPER"},
+    {"title": "Chuẩn Bị Cho Bé Vào Lớp 1 - Luyện Viết Chữ Đ đẹp Tập 2", "author": "Ban biên soạn", "publisher": "NXB Giáo Dục", "price": 17000, "discount_price": 14000, "category": "thieu-nhi", "stock": 45, "sold_count": 210, "rating": 4.8, "cover_image": "https://images.unsplash.com/photo-1544717305-2782549b5136?auto=format&fit=crop&q=80&w=500", "format": "PAPER"},
     {"title": "Bạn Vẫn Bạn Mình - Hình Dung Hành Dung", "author": "Nhiều tác giả", "publisher": "NXB Trẻ", "price": 45000, "discount_price": 39000, "category": "ky-nang", "stock": 40, "sold_count": 122, "rating": 4.6, "cover_image": "https://images.unsplash.com/photo-1495446815901-a7297e633e8d?auto=format&fit=crop&q=80&w=500", "format": "PAPER"},
     {"title": "The Heroes Of Olympus 4: The House Of Hades", "author": "Rick Riordan", "publisher": "Disney Hyperion", "price": 348000, "discount_price": 284750, "category": "van-hoc", "stock": 18, "sold_count": 230, "rating": 4.9, "cover_image": "https://images.unsplash.com/photo-1516979187457-637abb4f9353?auto=format&fit=crop&q=80&w=500", "format": "PAPER", "cover_type": "HARD"},
     {"title": "Lịch Sử Triết Học Phương Đông Việt Cho Thanh Thiếu Niên", "author": "Nguyễn Hiền Trang", "publisher": "NXB Kim Đồng", "price": 139000, "discount_price": 119000, "category": "van-hoc", "stock": 22, "sold_count": 140, "rating": 4.8, "cover_image": "https://images.unsplash.com/photo-1526243741027-444d633d7365?auto=format&fit=crop&q=80&w=500", "format": "PAPER"},
@@ -27,6 +27,36 @@ REFERENCE_CATALOG = [
     {"title": "Chế Độ Ăn Giảm Cân Và Kiểm Soát Đường Huyết", "author": "Nhiều tác giả", "publisher": "NXB Phụ Nữ", "price": 189000, "discount_price": 152000, "category": "ky-nang", "stock": 20, "sold_count": 319, "rating": 4.7, "cover_image": "https://images.unsplash.com/photo-1498837167922-ddd27525d352?auto=format&fit=crop&q=80&w=500", "format": "PAPER"},
     {"title": "You Are a Badass at Making Money", "author": "Jen Sincero", "publisher": "Viking", "price": 336000, "discount_price": 284750, "category": "kinh-te", "stock": 16, "sold_count": 133, "rating": 4.9, "cover_image": "https://images.unsplash.com/photo-1526243741027-444d633d7365?auto=format&fit=crop&q=80&w=500", "format": "PAPER"},
     {"title": "Combo Manga - Phiên Nữ Bé - Tập 5", "author": "Nhiều tác giả", "publisher": "NXB Kim Đồng", "price": 139000, "discount_price": 137500, "category": "thieu-nhi", "stock": 19, "sold_count": 254, "rating": 4.8, "cover_image": "https://images.unsplash.com/photo-1613376023733-0a73315d9b06?auto=format&fit=crop&q=80&w=500", "format": "PAPER"},
+]
+
+CONAN_COVER_IMAGES = {
+    "Thám Tử Lừng Danh Conan - Tập 104 (Bản Đặc Biệt)": "/static/images/conan/conan-104.svg",
+    "Thám Tử Lừng Danh Conan - Tập 103": "/static/images/conan/conan-103.svg",
+    "Thám Tử Lừng Danh Conan - Tập 102": "/static/images/conan/conan-102.svg",
+    "Thám Tử Lừng Danh Conan - Tập 107": "/static/images/conan/conan-107.svg",
+    "Thám Tử Lừng Danh Conan - Tập 106": "/static/images/conan/conan-106.svg",
+    "Thám Tử Lừng Danh Conan - Tập 31": "/static/images/conan/conan-31.svg",
+    "Thám Tử Lừng Danh Conan - Tập 101": "/static/images/conan/conan-101.svg",
+    "Thám Tử Lừng Danh Conan - Tập 105": "/static/images/conan/conan-105.svg",
+    "Thám Tử Lừng Danh Conan - Tập 43": "/static/images/conan/conan-43.svg",
+    "Thám Tử Lừng Danh Conan - Tập 33": "/static/images/conan/conan-33.svg",
+    "Thám Tử Lừng Danh Conan - Tập 27": "/static/images/conan/conan-27.svg",
+    "Thám Tử Lừng Danh Conan - Tập 15": "/static/images/conan/conan-15.svg",
+}
+
+ATTACHED_MANGA_CATALOG = [
+    {"title": "Thám Tử Lừng Danh Conan - Tập 104 (Bản Đặc Biệt)", "author": "Gosho Aoyama", "publisher": "NXB Kim Đồng", "price": 23750, "discount_price": 21750, "category": "thieu-nhi", "stock": 66, "sold_count": 412, "rating": 4.9, "cover_image": CONAN_COVER_IMAGES["Thám Tử Lừng Danh Conan - Tập 104 (Bản Đặc Biệt)"], "format": "PAPER"},
+    {"title": "Thám Tử Lừng Danh Conan - Tập 103", "author": "Gosho Aoyama", "publisher": "NXB Kim Đồng", "price": 23750, "discount_price": 21750, "category": "thieu-nhi", "stock": 62, "sold_count": 398, "rating": 4.9, "cover_image": CONAN_COVER_IMAGES["Thám Tử Lừng Danh Conan - Tập 103"], "format": "PAPER"},
+    {"title": "Thám Tử Lừng Danh Conan - Tập 102", "author": "Gosho Aoyama", "publisher": "NXB Kim Đồng", "price": 24000, "discount_price": 22000, "category": "thieu-nhi", "stock": 58, "sold_count": 370, "rating": 4.9, "cover_image": CONAN_COVER_IMAGES["Thám Tử Lừng Danh Conan - Tập 102"], "format": "PAPER"},
+    {"title": "Thám Tử Lừng Danh Conan - Tập 107", "author": "Gosho Aoyama", "publisher": "NXB Kim Đồng", "price": 23800, "discount_price": 21800, "category": "thieu-nhi", "stock": 50, "sold_count": 360, "rating": 4.9, "cover_image": CONAN_COVER_IMAGES["Thám Tử Lừng Danh Conan - Tập 107"], "format": "PAPER"},
+    {"title": "Thám Tử Lừng Danh Conan - Tập 106", "author": "Gosho Aoyama", "publisher": "NXB Kim Đồng", "price": 23750, "discount_price": 21750, "category": "thieu-nhi", "stock": 54, "sold_count": 355, "rating": 4.9, "cover_image": CONAN_COVER_IMAGES["Thám Tử Lừng Danh Conan - Tập 106"], "format": "PAPER"},
+    {"title": "Thám Tử Lừng Danh Conan - Tập 31", "author": "Gosho Aoyama", "publisher": "NXB Kim Đồng", "price": 33500, "discount_price": 30500, "category": "thieu-nhi", "stock": 41, "sold_count": 275, "rating": 4.8, "cover_image": CONAN_COVER_IMAGES["Thám Tử Lừng Danh Conan - Tập 31"], "format": "PAPER"},
+    {"title": "Thám Tử Lừng Danh Conan - Tập 101", "author": "Gosho Aoyama", "publisher": "NXB Kim Đồng", "price": 24000, "discount_price": 22000, "category": "thieu-nhi", "stock": 48, "sold_count": 332, "rating": 4.9, "cover_image": CONAN_COVER_IMAGES["Thám Tử Lừng Danh Conan - Tập 101"], "format": "PAPER"},
+    {"title": "Thám Tử Lừng Danh Conan - Tập 105", "author": "Gosho Aoyama", "publisher": "NXB Kim Đồng", "price": 23750, "discount_price": 21750, "category": "thieu-nhi", "stock": 52, "sold_count": 348, "rating": 4.9, "cover_image": CONAN_COVER_IMAGES["Thám Tử Lừng Danh Conan - Tập 105"], "format": "PAPER"},
+    {"title": "Thám Tử Lừng Danh Conan - Tập 43", "author": "Gosho Aoyama", "publisher": "NXB Kim Đồng", "price": 33500, "discount_price": 30500, "category": "thieu-nhi", "stock": 38, "sold_count": 244, "rating": 4.8, "cover_image": CONAN_COVER_IMAGES["Thám Tử Lừng Danh Conan - Tập 43"], "format": "PAPER"},
+    {"title": "Thám Tử Lừng Danh Conan - Tập 33", "author": "Gosho Aoyama", "publisher": "NXB Kim Đồng", "price": 33500, "discount_price": 30500, "category": "thieu-nhi", "stock": 42, "sold_count": 262, "rating": 4.8, "cover_image": CONAN_COVER_IMAGES["Thám Tử Lừng Danh Conan - Tập 33"], "format": "PAPER"},
+    {"title": "Thám Tử Lừng Danh Conan - Tập 27", "author": "Gosho Aoyama", "publisher": "NXB Kim Đồng", "price": 33500, "discount_price": 30500, "category": "thieu-nhi", "stock": 36, "sold_count": 231, "rating": 4.8, "cover_image": CONAN_COVER_IMAGES["Thám Tử Lừng Danh Conan - Tập 27"], "format": "PAPER"},
+    {"title": "Thám Tử Lừng Danh Conan - Tập 15", "author": "Gosho Aoyama", "publisher": "NXB Kim Đồng", "price": 24000, "discount_price": 22000, "category": "thieu-nhi", "stock": 46, "sold_count": 302, "rating": 4.8, "cover_image": CONAN_COVER_IMAGES["Thám Tử Lừng Danh Conan - Tập 15"], "format": "PAPER"}
 ]
 
 NON_BOOK_TITLES = {
@@ -53,6 +83,18 @@ FIXED_COVER_URLS = {
     "The Heroes Of Olympus 4: The House Of Hades": "https://images.unsplash.com/photo-1516979187457-637abb4f9353?auto=format&fit=crop&q=80&w=500",
     "Tên Cô Ấy Là": "https://images.unsplash.com/photo-1495446815901-a7297e633e8d?auto=format&fit=crop&q=80&w=500",
     "You Are a Badass at Making Money": "https://images.unsplash.com/photo-1526243741027-444d633d7365?auto=format&fit=crop&q=80&w=500",
+    "Thám Tử Lừng Danh Conan - Tập 104 (Bản Đặc Biệt)": "/static/images/conan/conan-104.svg",
+    "Thám Tử Lừng Danh Conan - Tập 103": "/static/images/conan/conan-103.svg",
+    "Thám Tử Lừng Danh Conan - Tập 102": "/static/images/conan/conan-102.svg",
+    "Thám Tử Lừng Danh Conan - Tập 107": "/static/images/conan/conan-107.svg",
+    "Thám Tử Lừng Danh Conan - Tập 106": "/static/images/conan/conan-106.svg",
+    "Thám Tử Lừng Danh Conan - Tập 31": "/static/images/conan/conan-31.svg",
+    "Thám Tử Lừng Danh Conan - Tập 101": "/static/images/conan/conan-101.svg",
+    "Thám Tử Lừng Danh Conan - Tập 105": "/static/images/conan/conan-105.svg",
+    "Thám Tử Lừng Danh Conan - Tập 43": "/static/images/conan/conan-43.svg",
+    "Thám Tử Lừng Danh Conan - Tập 33": "/static/images/conan/conan-33.svg",
+    "Thám Tử Lừng Danh Conan - Tập 27": "/static/images/conan/conan-27.svg",
+    "Thám Tử Lừng Danh Conan - Tập 15": "/static/images/conan/conan-15.svg",
 }
 
 def sync_reference_catalog(db):
@@ -73,7 +115,8 @@ def sync_reference_catalog(db):
     if not seller:
         return 0
     added = 0
-    for item in REFERENCE_CATALOG:
+    all_catalog_items = REFERENCE_CATALOG + ATTACHED_MANGA_CATALOG
+    for item in all_catalog_items:
         if item["title"] in existing or item["category"] not in categories:
             continue
         db.add(models.Book(
@@ -536,15 +579,15 @@ Tôi rất tự hào vì đôi càng tôi mẫm bóng, vuốt ở chân cứ c�
         )
         db.add(vip1)
 
-        # 6. TẠO ĐƠN HÀNG MẪU (Doanh thu Bán sách & Hoa hồng Sàn 10%)
+        # 6. TẠO ĐƠN HÀNG MẪU (Doanh thu Bán sách & Hoa hồng Sàn 5%)
         # ----------------------------------------------------
         # Đơn 1: Đang đóng gói
         order1 = models.Order(
             order_code="BH-260824-A189C2",
             buyer_id=buyer1.id,
             total_amount=214000.0,
-            platform_fee_percent=10.0,
-            platform_fee_amount=21400.0, # Sàn thu 21.4k
+            platform_fee_percent=5.0,
+            platform_fee_amount=10700.0, # Sàn thu 10.7k
             seller_payout_amount=192600.0, # NXB nhận 192.6k
             shipping_name="Nguyễn Bình An",
             shipping_phone="0912348899",
@@ -583,8 +626,8 @@ Tôi rất tự hào vì đôi càng tôi mẫm bóng, vuốt ở chân cứ c�
             order_code="BH-260824-B994F1",
             buyer_id=buyer_vip.id,
             total_amount=96000.0,
-            platform_fee_percent=10.0,
-            platform_fee_amount=9600.0, # Sàn thu 9.6k
+            platform_fee_percent=5.0,
+            platform_fee_amount=4800.0, # Sàn thu 4.8k
             seller_payout_amount=86400.0,
             shipping_name="Trần Minh Thư",
             shipping_phone="0934567890",

@@ -1,18 +1,25 @@
 """Pure marketplace financial calculations shared by API and tests."""
 from typing import Iterable
 
+COMMISSION_RATE = 0.05
+COMMISSION_RATE_PERCENT = COMMISSION_RATE * 100
+EXCLUDED_ORDER_STATUSES = {"CANCELLED", "CANCELED", "REJECTED", "FAILED"}
+
+
+def order_net_gmv(order: dict, refunded_amount: float = 0) -> float:
+    if str(order.get("status", "")).upper() in EXCLUDED_ORDER_STATUSES:
+        return 0.0
+    merchandise_value = float(order.get("subtotal_amount") or order.get("total_amount") or 0)
+    return max(merchandise_value - max(float(refunded_amount or 0), 0), 0)
+
 
 def calculate_gmv(orders: Iterable[dict]) -> float:
     """Sum merchandise values for valid, non-cancelled orders."""
-    return sum(
-        float(order.get("subtotal_amount") or order.get("total_amount") or 0)
-        for order in orders
-        if order.get("status") != "CANCELLED"
-    )
+    return sum(order_net_gmv(order, order.get("refunded_amount", 0)) for order in orders)
 
 
-def calculate_commission(gmv: float, commission_rate: float) -> float:
-    return max(float(gmv), 0) * max(float(commission_rate), 0) / 100
+def calculate_commission(gmv: float, commission_rate: float = COMMISSION_RATE) -> float:
+    return max(float(gmv), 0) * max(float(commission_rate), 0)
 
 
 def calculate_platform_revenue(

@@ -8,10 +8,11 @@ from sqlalchemy.orm import Session
 from database import get_db
 import models, schemas, auth
 import notification_service
+from financial import COMMISSION_RATE, COMMISSION_RATE_PERCENT, calculate_commission
 
 router = APIRouter(prefix="/api/orders", tags=["Orders"])
 
-PLATFORM_COMMISSION_RATE = 10.0 # 10% hoa hồng sàn
+PLATFORM_COMMISSION_RATE = COMMISSION_RATE_PERCENT
 
 SHIPPING_METHODS = {
     "STANDARD": {"name": "Giao tiết kiệm", "description": "Dự kiến nhận sau 2-4 ngày", "fee": 25000.0, "delivery_estimate": "12/09 - 14/09"},
@@ -329,8 +330,8 @@ def create_order(
         )
         items_to_create.append(order_item)
 
-    platform_fee = (total_amount * PLATFORM_COMMISSION_RATE) / 100.0
-    seller_payout = total_amount - platform_fee
+    platform_fee = calculate_commission(order_snapshot["subtotal"])
+    seller_payout = order_snapshot["subtotal"] - platform_fee
 
     order_code = f"BH-{datetime.utcnow().strftime('%y%m%d')}-{str(uuid.uuid4())[:6].upper()}"
 

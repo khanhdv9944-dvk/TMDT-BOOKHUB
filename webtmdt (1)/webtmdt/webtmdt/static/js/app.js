@@ -1159,7 +1159,7 @@ function renderCartModalContent() {
   container.innerHTML = html;
 
   // Tự động phân tách phí hoa hồng sàn 10% minh bạch
-  const platformFee = subtotal * 0.10;
+  const platformFee = subtotal * 0.05;
   const sellerReceives = subtotal - platformFee;
 
   summary.innerHTML = `
@@ -1169,7 +1169,7 @@ function renderCartModalContent() {
         <span style="font-weight:800; font-size:16px; color:#ef4444;">${formatVND(subtotal)}</span>
       </div>
       <div style="font-size:11px; color:#64748b; margin-bottom:12px; border-top:1px dashed #cbd5e1; padding-top:8px;">
-        ℹ️ <i>Cơ chế ăn chia: Sàn thu 10% phí dịch vụ (${formatVND(platformFee)}), NXB thực nhận 90% (${formatVND(sellerReceives)}) khi giao thành công.</i>
+        ℹ️ <i>Cơ chế ăn chia: Sàn thu 5% phí dịch vụ (${formatVND(platformFee)}), NXB thực nhận 95% (${formatVND(sellerReceives)}) khi giao thành công.</i>
       </div>
       
       <div class="form-group">
@@ -2310,7 +2310,7 @@ function filterSellerOrdersUI() {
         <td>
           <div style="font-size:13px;">Tổng: <b>${formatVND(o.seller_total)}</b></div>
           <div style="font-size:11px; color:#10b981; font-weight:700; margin-top:2px;">Thực nhận 90%: ${formatVND(o.seller_net)}</div>
-          <div style="font-size:10px; color:#94a3b8;">Phí sàn 10%: ${formatVND(o.seller_fee)}</div>
+          <div style="font-size:10px; color:#94a3b8;">Phí sàn 5%: ${formatVND(o.seller_fee)}</div>
         </td>
         <td>
           <div style="margin-bottom:4px;">${statusBadge}</div>
@@ -3101,7 +3101,7 @@ const adminMockService = { modules: {
   finance: { title: 'Tài chính & đối soát', description: 'Revenue, giao dịch và yêu cầu rút tiền', columns: ['Mã giao dịch', 'Seller', 'Loại', 'Gross', 'Fee', 'Net', 'Trạng thái'], rows: [['TX-92831', 'NXB Kim Đồng', 'Commission', '₫1.200.000', '₫120.000', '₫120.000', 'Đã đối soát'], ['TX-92830', 'Nhã Nam', 'Payout', '₫4.500.000', '₫0', '₫4.500.000', 'Chờ duyệt'], ['TX-92826', 'Alpha Books', 'Advertising', '₫800.000', '₫0', '₫800.000', 'Hoàn tất']] },
   marketing: { title: 'Marketing', description: 'Campaign, quảng cáo và voucher của marketplace', columns: ['Campaign', 'Seller', 'Ngân sách', 'Đã chi', 'Doanh thu', 'ROAS', 'Trạng thái'], rows: [['Back to school', 'NXB Kim Đồng', '₫20.000.000', '₫8.400.000', '₫64.200.000', '7.6x', 'Đang chạy'], ['Sách mới tháng 9', 'Nhã Nam', '₫8.000.000', '₫2.100.000', '₫14.800.000', '7.0x', 'Đang chạy']] },
   analytics: { title: 'Analytics', description: 'GMV, doanh thu, người dùng và sản phẩm', columns: ['Chỉ số', 'Hôm nay', '7 ngày', '30 ngày', 'So với kỳ trước'], rows: [['GMV', '₫10.250.000', '₫68.430.000', '₫248.900.000', '+12,4%'], ['Doanh thu sàn', '₫1.250.000', '₫7.950.000', '₫29.800.000', '+9,8%'], ['Người dùng mới', '48', '312', '1.284', '+18,2%']] },
-  settings: { title: 'Cài đặt hệ thống', description: 'Thiết lập marketplace và phân quyền vận hành', columns: ['Nhóm thiết lập', 'Giá trị hiện tại', 'Cập nhật'], rows: [['Commission', '10%', 'Cấu hình'], ['Minimum payout', '₫100.000', 'Cấu hình'], ['Payout schedule', 'Hàng tuần', 'Cấu hình'], ['Roles & Permissions', '6 vai trò', 'Mở ma trận']] }
+  settings: { title: 'Cài đặt hệ thống', description: 'Thiết lập marketplace và phân quyền vận hành', columns: ['Nhóm thiết lập', 'Giá trị hiện tại', 'Cập nhật'], rows: [['Commission', '5%', 'Cấu hình'], ['Minimum payout', '₫100.000', 'Cấu hình'], ['Payout schedule', 'Hàng tuần', 'Cấu hình'], ['Roles & Permissions', '6 vai trò', 'Mở ma trận']] }
 } };
 
 function switchAdminView(view, button) {

@@ -144,7 +144,7 @@ class Order(Base):
     
     # Tài chính & % Phí sàn
     total_amount = Column(Float, nullable=False)
-    platform_fee_percent = Column(Float, default=10.0) # Hoa hồng sàn 8-15% (mặc định 10%)
+    platform_fee_percent = Column(Float, default=5.0) # Tỷ lệ phần trăm phí hoa hồng sàn
     platform_fee_amount = Column(Float, default=0.0)   # Tiền sàn thu về
     seller_payout_amount = Column(Float, default=0.0)  # Tiền NXB thực nhận
     

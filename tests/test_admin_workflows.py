@@ -25,7 +25,7 @@ class AdminWorkflowTests(unittest.TestCase):
         self.db.add_all([self.admin, self.seller, self.buyer])
         self.db.commit()
         self.db.refresh(self.admin); self.db.refresh(self.seller); self.db.refresh(self.buyer)
-        order = models.Order(order_code="WF-001", buyer_id=self.buyer.id, total_amount=100000, subtotal_amount=100000, platform_fee_amount=10000, seller_payout_amount=90000, shipping_name="Buyer", shipping_phone="0900000000", shipping_address="HCM", created_at=datetime.utcnow())
+        order = models.Order(order_code="WF-001", buyer_id=self.buyer.id, total_amount=100000, subtotal_amount=100000, platform_fee_percent=5.0, platform_fee_amount=5000, seller_payout_amount=95000, shipping_name="Buyer", shipping_phone="0900000000", shipping_address="HCM", created_at=datetime.utcnow())
         self.db.add(order); self.db.commit(); self.db.refresh(order)
         self.dispute = models.Dispute(dispute_code="DSP-WF-1", order_id=order.id, buyer_id=self.buyer.id, seller_id=self.seller.id, reason="Damaged", description="Damaged book", amount=100000)
         self.payout = models.WithdrawalRequest(seller_id=self.seller.id, amount=100000, bank_name="Test Bank", bank_account_number="1234", bank_account_holder="Seller", status="PENDING")
@@ -66,6 +66,60 @@ class AdminWorkflowTests(unittest.TestCase):
         token = auth.create_access_token({"sub": self.seller.username, "role": "SELLER"})
         response = self.client.get("/api/admin/payouts", headers={"Authorization": f"Bearer {token}"})
         self.assertEqual(response.status_code, 403)
+
+    def test_admin_return_list_endpoint_exists(self):
+        return_request = models.ReturnRequest(
+            order_id=1,
+            user_id=self.buyer.id,
+            status=models.ReturnRequestStatus.PENDING.value,
+            reason=models.ReturnReason.PRODUCT_DEFECT.value,
+            refund_amount=50000,
+            description="Sách bị lỗi"
+        )
+        self.db.add(return_request)
+        self.db.commit()
+        self.db.refresh(return_request)
+
+        response = self.client.get("/api/admin/returns", headers=self.headers)
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertIsInstance(payload, list)
+        self.assertGreaterEqual(len(payload), 1)
+        self.assertEqual(payload[0]["order_id"], 1)
+
+    def test_seller_return_list_endpoint_exists(self):
+        return_request = models.ReturnRequest(
+            order_id=1,
+            user_id=self.buyer.id,
+            status=models.ReturnRequestStatus.PENDING.value,
+            reason=models.ReturnReason.PRODUCT_DEFECT.value,
+            refund_amount=50000,
+            description="Sách bị lỗi"
+        )
+        self.db.add(return_request)
+        self.db.commit()
+        self.db.refresh(return_request)
+
+        token = auth.create_access_token({"sub": self.seller.username, "role": "SELLER"})
+        response = self.client.get("/api/seller/returns", headers={"Authorization": f"Bearer {token}"})
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertIsInstance(payload, list)
+
+    def test_seller_upload_document_and_admin_preview(self):
+        seller_token = auth.create_access_token({"sub": self.seller.username, "role": "SELLER"})
+        upload_response = self.client.post(
+            "/api/auth/seller/upload-document",
+            files={"file": ("license.pdf", b"%PDF-1.4\n1 0 obj\n<<>>\nendobj\ntrailer\n<<>>\n%%EOF", "application/pdf")},
+            data={"document_type": "BUSINESS_LICENSE"},
+            headers={"Authorization": f"Bearer {seller_token}"}
+        )
+        self.assertEqual(upload_response.status_code, 200, upload_response.text)
+        doc_id = upload_response.json()["id"]
+
+        preview_response = self.client.get(f"/api/admin/documents/{doc_id}/preview", headers=self.headers)
+        self.assertEqual(preview_response.status_code, 200)
+        self.assertTrue(preview_response.json()["available"])
 
 
 if __name__ == "__main__":

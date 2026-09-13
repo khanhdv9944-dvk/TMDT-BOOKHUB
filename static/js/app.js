@@ -42,6 +42,26 @@ function formatVND(amount) {
   return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount);
 }
 
+function normalizeErrorMessage(value) {
+  if (value == null) return 'Có lỗi xảy ra';
+  if (typeof value === 'string') return value;
+  if (value instanceof Error) return value.message || value.toString();
+  if (Array.isArray(value)) {
+    return value.map(item => normalizeErrorMessage(item)).filter(Boolean).join(', ');
+  }
+  if (typeof value === 'object') {
+    if (typeof value.message === 'string') return value.message;
+    if (typeof value.detail === 'string') return value.detail;
+    if (Array.isArray(value.detail)) return normalizeErrorMessage(value.detail);
+    try {
+      return JSON.stringify(value);
+    } catch (error) {
+      return String(value);
+    }
+  }
+  return String(value);
+}
+
 function showToast(msg, type = 'info') {
   const container = document.getElementById('toast-container');
   const toast = document.createElement('div');
@@ -52,7 +72,8 @@ function showToast(msg, type = 'info') {
   if (type === 'error') icon = '❌';
   if (type === 'warning') icon = '⚠️';
 
-  toast.innerHTML = `<span>${icon}</span> <span>${msg}</span>`;
+  const text = normalizeErrorMessage(msg);
+  toast.innerHTML = `<span>${icon}</span> <span>${text}</span>`;
   container.appendChild(toast);
 
   setTimeout(() => {
@@ -76,14 +97,18 @@ async function apiCall(endpoint, options = {}) {
       ...options,
       headers
     });
-    
+
     const data = await res.json();
     if (!res.ok) {
-      throw new Error(data.detail || 'Có lỗi xảy ra khi gọi máy chủ');
+      const message = data && typeof data.detail !== 'undefined'
+        ? normalizeErrorMessage(data.detail)
+        : 'Có lỗi xảy ra khi gọi máy chủ';
+      throw new Error(message);
     }
     return data;
   } catch (err) {
-    showToast(err.message, 'error');
+    const message = normalizeErrorMessage(err);
+    showToast(message, 'error');
     throw err;
   }
 }
@@ -521,6 +546,7 @@ function renderUserProfileWidget() {
 
   if (guestActions) guestActions.style.display = 'none';
   if (logoutBtn) logoutBtn.style.display = 'inline-flex';
+  if (footerLogout) footerLogout.style.display = 'inline-block';
 }
 
 function getRoleDisplayName(role, shopName) {
@@ -830,8 +856,7 @@ function renderPublicHomeSections(books) {
   }
 
   if (bestSellerGrid) {
-    const best = [...books].sort((a, b) => (b.sold_count || 0) - (a.sold_count || 0)).slice(0, 5);
-    bestSellerGrid.innerHTML = renderBookCards(best, false);
+    renderBestSellerSection(books);
   }
 
   if (newBooksGrid) {
@@ -848,6 +873,120 @@ function renderPublicHomeSections(books) {
       <button class="btn-vip-gold" onclick="${state.currentUser ? 'openVipModal()' : 'requireLoginForAction(\'Khám phá gói VIP\')'}">Khám phá VIP</button>
     `;
   }
+}
+
+function renderBestSellerSection(books, selectedBookId = null, categoryId = null) {
+  const bestSellerGrid = document.getElementById('bestseller-books-grid');
+  if (!bestSellerGrid) return;
+
+  const categories = (state.categories?.length ? state.categories : [
+    { id: 1, name: 'Văn học' },
+    { id: 2, name: 'Kinh tế' },
+    { id: 3, name: 'Tâm lý - Kỹ năng sống' },
+    { id: 4, name: 'Thiếu nhi' },
+    { id: 5, name: 'Sách học ngoại ngữ' },
+    { id: 6, name: 'Foreign books' },
+    { id: 7, name: 'Lịch Sử - Địa Lý - Tôn Giáo' },
+    { id: 8, name: 'Khoa học kỹ thuật' },
+    { id: 9, name: 'Thể loại khác' }
+  ]).slice(0, 9);
+
+  const filteredBooks = categoryId
+    ? books.filter(book => Number(book.category_id) === Number(categoryId))
+    : books;
+
+  const sourceBooks = filteredBooks.length ? filteredBooks : books;
+  const rankedBooks = [...sourceBooks].sort((a, b) => (b.sold_count || 0) - (a.sold_count || 0)).slice(0, 4);
+
+  const selected = rankedBooks.find(book => Number(book.id) === Number(selectedBookId)) || rankedBooks[0];
+  if (!selected && rankedBooks.length) return;
+
+  const tabs = categories.map((category, index) => {
+    const isActive = categoryId === null ? index === 0 : Number(category.id) === Number(categoryId);
+    return `<button class="best-seller-tab ${isActive ? 'active' : ''}" data-category-id="${category.id || ''}" type="button">${category.name}</button>`;
+  }).join('');
+
+  const detailBook = selected || books[0];
+  if (!detailBook) {
+    bestSellerGrid.innerHTML = '<div class="detail-empty">Chưa có dữ liệu Best Sellers cho danh mục này.</div>';
+    return;
+  }
+
+  const detailDiscount = Number(detailBook.price || 0) > Number(detailBook.discount_price || detailBook.price || 0)
+    ? Math.round((1 - (Number(detailBook.discount_price || detailBook.price || 0) / Number(detailBook.price || 1))) * 100)
+    : 0;
+  const detailCurrentPrice = Number(detailBook.discount_price || detailBook.price || 0);
+  const detailOldPrice = Number(detailBook.discount_price) ? Number(detailBook.price) : null;
+
+  const listHtml = rankedBooks.map((book, index) => {
+    const activeClass = Number(book.id) === Number(detailBook.id) ? 'active' : '';
+    const badge = ['Top 1', 'Top 2', 'Top 3', 'Top 4'][index] || `Top ${index + 1}`;
+    return `
+      <button class="best-seller-item ${activeClass}" data-book-id="${book.id}" type="button">
+        <div class="best-seller-rank">${index + 1}</div>
+        <div class="best-seller-thumb"><img src="${book.cover_image || 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?auto=format&fit=crop&q=80&w=400'}" alt="${book.title}"></div>
+        <div class="best-seller-meta">
+          <span class="best-seller-badge">${badge}</span>
+          <div class="best-seller-name">${book.title}</div>
+          <div class="best-seller-sales">Đã bán trong tuần ${book.sold_count || 96}</div>
+        </div>
+      </button>
+    `;
+  }).join('');
+
+  bestSellerGrid.innerHTML = `
+    <div class="best-sellers-header">
+      <h2 class="best-sellers-title"><span class="best-sellers-icon">🔥</span>Best Sellers</h2>
+    </div>
+    <div class="best-sellers-tabs">${tabs}</div>
+    <div class="best-sellers-body">
+      <div class="best-sellers-list">${listHtml}</div>
+      <div class="best-sellers-detail">
+        <div class="best-seller-detail-card">
+          <div class="best-seller-detail-image">
+            <img src="${detailBook.cover_image || 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?auto=format&fit=crop&q=80&w=400'}" alt="${detailBook.title}">
+          </div>
+          <div class="best-seller-detail-body">
+            <h3 class="best-seller-detail-title">${detailBook.title}</h3>
+            <div class="best-seller-detail-sales">${detailBook.sold_count || 96} đã bán trong tuần</div>
+            <div class="best-seller-detail-meta">
+              <span>Tác giả: ${detailBook.author || 'Đang cập nhật'}</span>
+              <span>Nhà xuất bản: ${detailBook.publisher || 'Đang cập nhật'}</span>
+              <span>Thể loại: ${detailBook.category_name || (state.categories?.find(cat => Number(cat.id) === Number(detailBook.category_id))?.name || 'Đang cập nhật')}</span>
+            </div>
+            <div class="best-seller-detail-price">
+              <span class="best-seller-price-current">${formatVND(detailCurrentPrice)}</span>
+              ${detailOldPrice ? `<span class="best-seller-price-old">${formatVND(detailOldPrice)}</span>` : ''}
+              ${detailDiscount > 0 ? `<span class="best-seller-discount">-${detailDiscount}%</span>` : ''}
+            </div>
+            <button class="best-seller-cart-btn" type="button" onclick="event.stopPropagation(); addToCart(${detailBook.id});">🛒 Thêm vào giỏ hàng</button>
+            <p class="best-seller-description">${detailBook.description || 'Khám phá cuốn sách được yêu thích nhất trong tuần và trải nghiệm một lựa chọn đọc đáng tin cậy với chất lượng đầu ra và giá trị nội dung cao.'}</p>
+            <div class="best-seller-review-row">
+              <span class="best-seller-review-row-label">Đánh giá sản phẩm</span>
+              <div>
+                <span class="best-seller-review-stars">${'★'.repeat(Math.min(5, Math.max(1, Math.round(Number(detailBook.rating || 4.8)))))}${'☆'.repeat(Math.max(0, 5 - Math.min(5, Math.max(1, Math.round(Number(detailBook.rating || 4.8))))))}</span>
+                <span class="best-seller-review-count">${Number(detailBook.rating || 4.8).toFixed(1)} / 5</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+
+  bestSellerGrid.querySelectorAll('.best-seller-item').forEach(item => {
+    item.addEventListener('click', () => {
+      const bookId = Number(item.dataset.bookId);
+      renderBestSellerSection(books, bookId, categoryId || null);
+    });
+  });
+
+  bestSellerGrid.querySelectorAll('.best-seller-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      const categoryIdValue = tab.dataset.categoryId ? Number(tab.dataset.categoryId) : null;
+      renderBestSellerSection(books, null, categoryIdValue);
+    });
+  });
 }
 
 function renderBookCards(books, showFeaturedFlag = true) {
@@ -1203,8 +1342,8 @@ function renderCartModalContent() {
   });
   container.innerHTML = html;
 
-  // Tự động phân tách phí hoa hồng sàn 10% minh bạch
-  const platformFee = subtotal * 0.10;
+  // Hiển thị cùng tỷ lệ commission mà backend dùng khi tạo order.
+  const platformFee = subtotal * 0.05;
   const sellerReceives = subtotal - platformFee;
 
   summary.innerHTML = `
@@ -1214,7 +1353,7 @@ function renderCartModalContent() {
         <span style="font-weight:800; font-size:16px; color:#ef4444;">${formatVND(subtotal)}</span>
       </div>
       <div style="font-size:11px; color:#64748b; margin-bottom:12px; border-top:1px dashed #cbd5e1; padding-top:8px;">
-        ℹ️ <i>Cơ chế ăn chia: Sàn thu 10% phí dịch vụ (${formatVND(platformFee)}), NXB thực nhận 90% (${formatVND(sellerReceives)}) khi giao thành công.</i>
+        ℹ️ <i>Cơ chế ăn chia: Sàn thu 5% phí dịch vụ (${formatVND(platformFee)}), NXB thực nhận 95% (${formatVND(sellerReceives)}) khi giao thành công.</i>
       </div>
       
       <div class="form-group">
@@ -3137,7 +3276,7 @@ function filterSellerOrdersUI() {
         <td>
           <div style="font-size:13px;">Tổng: <b>${formatVND(o.seller_total)}</b></div>
           <div style="font-size:11px; color:#10b981; font-weight:700; margin-top:2px;">Thực nhận 90%: ${formatVND(o.seller_net)}</div>
-          <div style="font-size:10px; color:#94a3b8;">Phí sàn 10%: ${formatVND(o.seller_fee)}</div>
+          <div style="font-size:10px; color:#94a3b8;">Phí sàn 5%: ${formatVND(o.seller_fee)}</div>
         </td>
         <td>
           <div style="margin-bottom:4px;">${statusBadge}</div>
@@ -3908,7 +4047,7 @@ async function loadAdminDashboard() {
     const kpis = [
       ['GMV', formatVND(summary.gmv ?? summary.total_gmv_gross), 'Tổng giá trị hàng hóa', 'money', 'dashboard'],
       ['Doanh thu sàn', formatVND(summary.platform_revenue ?? summary.total_platform_profit), 'Phí hoa hồng thực tế trên đơn hàng', 'revenue', 'finance'],
-      ['Hoa hồng', formatVND(summary.commission_revenue || 0), 'Phí trên đơn hàng', 'commission', 'finance'],
+      ['Hoa hồng', formatVND(summary.commission_revenue || 0), '5% phí trên đơn hàng', 'commission', 'finance'],
       ['Đơn hàng', stats.total_orders, 'Đơn không bị hủy', 'orders', 'orders'],
       ['Người dùng', stats.total_users, 'Buyer, seller và admin', 'users', 'users'],
       ['Seller / NXB', stats.total_sellers, `${stats.pending_sellers} hồ sơ chờ duyệt`, 'sellers', 'sellers'],
@@ -3934,7 +4073,7 @@ const adminMockService = { modules: {
   finance: { title: 'Tài chính & đối soát', description: 'Revenue, giao dịch và yêu cầu rút tiền', columns: ['Mã giao dịch', 'Seller', 'Loại', 'Gross', 'Fee', 'Net', 'Trạng thái'], rows: [['TX-92831', 'NXB Kim Đồng', 'Commission', '₫1.200.000', '₫120.000', '₫120.000', 'Đã đối soát'], ['TX-92830', 'Nhã Nam', 'Payout', '₫4.500.000', '₫0', '₫4.500.000', 'Chờ duyệt'], ['TX-92826', 'Alpha Books', 'Advertising', '₫800.000', '₫0', '₫800.000', 'Hoàn tất']] },
   marketing: { title: 'Marketing', description: 'Campaign, quảng cáo và voucher của marketplace', columns: ['Campaign', 'Seller', 'Ngân sách', 'Đã chi', 'Doanh thu', 'ROAS', 'Trạng thái'], rows: [['Back to school', 'NXB Kim Đồng', '₫20.000.000', '₫8.400.000', '₫64.200.000', '7.6x', 'Đang chạy'], ['Sách mới tháng 9', 'Nhã Nam', '₫8.000.000', '₫2.100.000', '₫14.800.000', '7.0x', 'Đang chạy']] },
   analytics: { title: 'Analytics', description: 'GMV, doanh thu, người dùng và sản phẩm', columns: ['Chỉ số', 'Hôm nay', '7 ngày', '30 ngày', 'So với kỳ trước'], rows: [['GMV', '₫10.250.000', '₫68.430.000', '₫248.900.000', '+12,4%'], ['Doanh thu sàn', '₫1.250.000', '₫7.950.000', '₫29.800.000', '+9,8%'], ['Người dùng mới', '48', '312', '1.284', '+18,2%']] },
-  settings: { title: 'Cài đặt hệ thống', description: 'Thiết lập marketplace và phân quyền vận hành', columns: ['Nhóm thiết lập', 'Giá trị hiện tại', 'Cập nhật'], rows: [['Commission', '10%', 'Cấu hình'], ['Minimum payout', '₫100.000', 'Cấu hình'], ['Payout schedule', 'Hàng tuần', 'Cấu hình'], ['Roles & Permissions', '6 vai trò', 'Mở ma trận']] }
+  settings: { title: 'Cài đặt hệ thống', description: 'Thiết lập marketplace và phân quyền vận hành', columns: ['Nhóm thiết lập', 'Giá trị hiện tại', 'Cập nhật'], rows: [['Commission', '5%', 'Cấu hình'], ['Minimum payout', '₫100.000', 'Cấu hình'], ['Payout schedule', 'Hàng tuần', 'Cấu hình'], ['Roles & Permissions', '6 vai trò', 'Mở ma trận']] }
 } };
 
 function switchAdminView(view, button) {
@@ -4066,7 +4205,21 @@ function renderPayoutDetail(id) { adminService().PayoutService.getPayout(id).the
 function runAdminAction(button, operation, successMessage) { const target = button && button instanceof HTMLElement ? button : null; const original = target?.textContent || ''; if (target) { target.disabled = true; target.textContent = 'Đang xử lý...'; } return operation().then(() => { showToast(successMessage, 'success'); return true; }).catch(error => { showToast(`Không thể xử lý: ${error.message}`, 'error'); return false; }).finally(() => { if (target) { target.disabled = false; target.textContent = original; } }); }
 function confirmAdminAction(title, callback) { if (window.confirm(`${title}\n\nĐây là thao tác mock; backend cần xác thực lại.`)) callback(); }
 function promptAdminReason(title, callback) { const reason = window.prompt(`${title}\nNhập lý do:`); if (reason?.trim()) callback(reason.trim()); else if (reason !== null) showToast('Vui lòng nhập lý do.', 'warning'); }
-function openAdminDocument(id) { adminService().DocumentService.getDocumentPreview(id).then(doc => { const message = doc.available ? `<iframe class="admin-document-frame" src="${doc.fileUrl}" title="${doc.fileName}"></iframe>` : `<div class="admin-document-unavailable">${doc.message}</div>`; const overlay = document.createElement('div'); overlay.className = 'admin-dialog-overlay'; overlay.innerHTML = `<div class="admin-dialog"><div class="admin-dialog-heading"><h2>Document Viewer</h2><button onclick="this.closest('.admin-dialog-overlay').remove()">×</button></div><p><b>${doc.fileName}</b> · ${doc.type}</p>${message}<div class="admin-dialog-actions"><button class="admin-button secondary" onclick="this.closest('.admin-dialog-overlay').remove()">Đóng</button>${doc.available ? `<button class="admin-button primary" onclick="AdminServices.DocumentService.downloadDocument('${id}')">Download</button>` : ''}</div></div>`; document.body.appendChild(overlay); }).catch(error => showToast(`Không thể mở tài liệu: ${error.message}`, 'error')); }
+function openAdminDocument(id) {
+  adminService().DocumentService.getDocumentPreview(id).then(doc => {
+    const safeDoc = doc || {};
+    const docName = safeDoc.fileName || 'Tài liệu';
+    const docType = safeDoc.type || 'OTHER';
+    const fileUrl = safeDoc.fileUrl || safeDoc.file_url || '';
+    const message = safeDoc.available && fileUrl ? `<iframe class="admin-document-frame" src="${fileUrl}" title="${docName}"></iframe>` : `<div class="admin-document-unavailable">${normalizeErrorMessage(safeDoc.message || 'Tài liệu chưa sẵn sàng để xem.')}</div>`;
+    const overlay = document.createElement('div');
+    overlay.className = 'admin-dialog-overlay';
+    overlay.innerHTML = `<div class="admin-dialog"><div class="admin-dialog-heading"><h2>Document Viewer</h2><button onclick="this.closest('.admin-dialog-overlay').remove()">×</button></div><p><b>${docName}</b> · ${docType}</p>${message}<div class="admin-dialog-actions"><button class="admin-button secondary" onclick="this.closest('.admin-dialog-overlay').remove()">Đóng</button>${safeDoc.available && fileUrl ? `<button class="admin-button primary" onclick="AdminServices.DocumentService.downloadDocument('${id}')">Download</button>` : ''}</div></div>`;
+    document.body.appendChild(overlay);
+  }).catch(error => {
+    showToast(`Không thể mở tài liệu: ${normalizeErrorMessage(error)}`, 'error');
+  });
+}
 
 function renderAdminGrowthChart(gmv, revenue) {
   const chart = document.getElementById('admin-growth-chart');
