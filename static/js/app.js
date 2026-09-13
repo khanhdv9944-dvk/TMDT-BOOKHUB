@@ -2237,6 +2237,9 @@ async function loadSellerDashboard() {
 
     // Tải thông tin hồ sơ cho header (địa chỉ kho, logo preview)
     loadSellerProfileMini();
+
+    // Tải và hiển thị danh sách thông báo trên Dashboard
+    fetchAndUpdateNotifications();
   } catch (e) {
     console.error('Lỗi khi tải Dashboard Seller:', e);
   }
@@ -4676,6 +4679,7 @@ async function enterMainApp() {
   });
 
   await loadCategories();
+  startNotifPolling();
 
   // Route to correct portal based on role
   if (state.currentUser.role === 'ADMIN') {
@@ -5039,6 +5043,10 @@ function handleLogout() {
   localStorage.removeItem('bookhub_user');
   localStorage.removeItem('bookhub_cart');
   updateCartBadge();
+  stopNotifPolling();
+  notifState.notifications = [];
+  notifState.unreadCount = 0;
+  updateNotifBadge();
 
   showToast('Đã đăng xuất thành công!', 'info');
   renderUserProfileWidget();
@@ -5271,7 +5279,7 @@ async function submitSingleProductOrder() {
 }
 
 // =============================================================================
-// HỆ THỐNG THÔNG BÁO HAI CHIỀU (NXB ↔ Admin)
+// HỆ THỐNG THÔNG BÁO HAI CHIỀU (NXB ↔ Admin & Khách hàng)
 // =============================================================================
 
 /** State thông báo - lưu trạng thái hiện tại */
@@ -5282,6 +5290,176 @@ const notifState = {
   dropdownOpen: null // 'seller' | 'admin' | null
 };
 
+let sellerNotifFilter = 'all';
+
+function setSellerNotifFilter(filter, btn) {
+  sellerNotifFilter = filter;
+  if (btn) {
+    document.querySelectorAll('.seller-notif-pill-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+  }
+  renderSellerDashboardNotifs();
+}
+
+/**
+ * Phân tích metadata của thông báo để lấy Icon, Màu sắc, Badge Tag và Điểm đến điều hướng
+ */
+function getNotificationMeta(n) {
+  const type = (n && n.type) ? String(n.type) : '';
+  
+  // Phân loại: Đơn hàng từ khách vs Hệ thống / BQT
+  const isOrder = type.startsWith('ORDER_') || type.startsWith('RETURN_');
+  const isSystem = !isOrder;
+
+  let icon = '🔔';
+  let iconBg = '#eef2ff';
+  let iconColor = '#4f46e5';
+  let tagClass = 'tag-system-notice';
+  let tagText = 'Thông Báo';
+  let actionText = 'Xem chi tiết →';
+  let targetTab = null;
+
+  switch (type) {
+    case 'ORDER_CREATED':
+      icon = '📦';
+      iconBg = '#ecfdf5';
+      iconColor = '#059669';
+      tagClass = 'tag-order-new';
+      tagText = 'Đơn hàng mới';
+      actionText = 'Xem đơn & Chuẩn bị đóng gói →';
+      targetTab = 'orders';
+      break;
+    case 'ORDER_PACKING':
+      icon = '🎁';
+      iconBg = '#fef3c7';
+      iconColor = '#d97706';
+      tagClass = 'tag-order-process';
+      tagText = 'Đang đóng gói';
+      actionText = 'Xem đơn hàng →';
+      targetTab = 'orders';
+      break;
+    case 'ORDER_SHIPPING':
+      icon = '🚚';
+      iconBg = '#fef3c7';
+      iconColor = '#d97706';
+      tagClass = 'tag-order-process';
+      tagText = 'Đang vận chuyển';
+      actionText = 'Theo dõi vận đơn →';
+      targetTab = 'orders';
+      break;
+    case 'ORDER_OUT_FOR_DELIVERY':
+      icon = '🛵';
+      iconBg = '#fef3c7';
+      iconColor = '#d97706';
+      tagClass = 'tag-order-process';
+      tagText = 'Đang phát hàng';
+      actionText = 'Xem đơn hàng →';
+      targetTab = 'orders';
+      break;
+    case 'ORDER_DELIVERED':
+      icon = '✅';
+      iconBg = '#f0fdf4';
+      iconColor = '#16a34a';
+      tagClass = 'tag-order-success';
+      tagText = 'Khách đã nhận';
+      actionText = 'Xem đơn hàng & Doanh thu →';
+      targetTab = 'orders';
+      break;
+    case 'ORDER_REVIEWED':
+      icon = '⭐';
+      iconBg = '#fffbeb';
+      iconColor = '#b45309';
+      tagClass = 'tag-order-review';
+      tagText = 'Đánh giá mới';
+      actionText = 'Xem đánh giá sản phẩm →';
+      targetTab = 'orders';
+      break;
+    case 'RETURN_REQUESTED':
+    case 'RETURN_UPDATED':
+      icon = '🔄';
+      iconBg = '#fff1f2';
+      iconColor = '#e11d48';
+      tagClass = 'tag-order-return';
+      tagText = 'Yêu cầu đổi trả';
+      actionText = 'Xử lý yêu cầu trả hàng →';
+      targetTab = 'orders';
+      break;
+    case 'BOOK_APPROVED':
+      icon = '✨';
+      iconBg = '#eef2ff';
+      iconColor = '#4f46e5';
+      tagClass = 'tag-system-approved';
+      tagText = 'Sách đã duyệt';
+      actionText = 'Xem sách trong kho →';
+      targetTab = 'products';
+      break;
+    case 'BOOK_REJECTED':
+      icon = '❌';
+      iconBg = '#fef2f2';
+      iconColor = '#dc2626';
+      tagClass = 'tag-system-rejected';
+      tagText = 'Sách bị từ chối';
+      actionText = 'Kiểm tra & Chỉnh sửa →';
+      targetTab = 'products';
+      break;
+    case 'NEW_BOOK_SUBMITTED':
+      icon = '📚';
+      iconBg = '#f8fafc';
+      iconColor = '#475569';
+      tagClass = 'tag-system-notice';
+      tagText = 'Gửi duyệt sách';
+      actionText = 'Xem danh sách sách →';
+      targetTab = 'products';
+      break;
+    case 'PAYOUT_APPROVED':
+      icon = '💵';
+      iconBg = '#f0fdfa';
+      iconColor = '#0d9488';
+      tagClass = 'tag-system-payout';
+      tagText = 'Rút tiền thành công';
+      actionText = 'Xem lịch sử ví tài chính →';
+      targetTab = 'settings';
+      break;
+    case 'PAYOUT_REJECTED':
+      icon = '⚠️';
+      iconBg = '#fef2f2';
+      iconColor = '#dc2626';
+      tagClass = 'tag-system-rejected';
+      tagText = 'Lệnh rút bị hủy';
+      actionText = 'Xem chi tiết ví →';
+      targetTab = 'settings';
+      break;
+    case 'LOW_STOCK_ALERT':
+      icon = '⚠️';
+      iconBg = '#fff7ed';
+      iconColor = '#ea580c';
+      tagClass = 'tag-system-alert';
+      tagText = 'Tồn kho thấp';
+      actionText = 'Nhập thêm tồn kho →';
+      targetTab = 'products';
+      break;
+    case 'SYSTEM_ANNOUNCEMENT':
+      icon = '📢';
+      iconBg = '#f8fafc';
+      iconColor = '#475569';
+      tagClass = 'tag-system-notice';
+      tagText = 'Thông báo BQT';
+      actionText = 'Xem thông báo →';
+      targetTab = null;
+      break;
+    default:
+      icon = '🔔';
+      iconBg = '#eef2ff';
+      iconColor = '#4f46e5';
+      tagClass = 'tag-system-notice';
+      tagText = 'Hệ thống';
+      actionText = 'Xem chi tiết →';
+      targetTab = null;
+  }
+
+  return { isOrder, isSystem, icon, iconBg, iconColor, tagClass, tagText, actionText, targetTab };
+}
+
 /**
  * Lấy danh sách thông báo từ API và cập nhật UI.
  * Gọi mỗi khi portal được mở hoặc theo polling interval.
@@ -5290,7 +5468,7 @@ async function fetchAndUpdateNotifications() {
   if (!state.token || !state.currentUser) return;
   try {
     const [notifications, countData] = await Promise.all([
-      fetch('/api/notifications?limit=20', {
+      fetch('/api/notifications?limit=50', {
         headers: { 'Authorization': `Bearer ${state.token}` }
       }).then(r => r.ok ? r.json() : []),
       fetch('/api/notifications/unread-count', {
@@ -5303,7 +5481,10 @@ async function fetchAndUpdateNotifications() {
 
     updateNotifBadge();
 
-    // Nếu dropdown đang mở, cập nhật nội dung luôn
+    // Render danh sách trên Dashboard NXB nếu phần tử tồn tại
+    renderSellerDashboardNotifs();
+
+    // Nếu dropdown đang mở, cập nhật nội dung dropdown
     if (notifState.dropdownOpen) {
       renderNotifList(notifState.dropdownOpen);
     }
@@ -5323,8 +5504,10 @@ function updateNotifBadge() {
     if (role === 'SELLER' && count > 0) {
       sellerBadge.textContent = count > 99 ? '99+' : count;
       sellerBadge.style.display = 'flex';
+      sellerBadge.parentElement?.classList.add('has-unread');
     } else {
       sellerBadge.style.display = 'none';
+      sellerBadge.parentElement?.classList.remove('has-unread');
     }
   }
 
@@ -5334,13 +5517,149 @@ function updateNotifBadge() {
     if (role === 'ADMIN' && count > 0) {
       adminBadge.textContent = count > 99 ? '99+' : count;
       adminBadge.style.display = 'flex';
+      adminBadge.parentElement?.classList.add('has-unread');
     } else {
       adminBadge.style.display = 'none';
+      adminBadge.parentElement?.classList.remove('has-unread');
+    }
+  }
+
+  // Header Notification Badge (Buyer / All roles)
+  const headerBadge = document.getElementById('header-notif-badge');
+  if (headerBadge) {
+    if (count > 0) {
+      headerBadge.textContent = count > 99 ? '99+' : count;
+      headerBadge.style.display = 'flex';
+    } else {
+      headerBadge.style.display = 'none';
     }
   }
 }
 
-/** Render danh sách thông báo trong dropdown */
+/** Render danh sách thông báo trên Trang chủ NXB (Dashboard Widget) */
+function renderSellerDashboardNotifs() {
+  const container = document.getElementById('seller-dashboard-notif-list');
+  if (!container) return;
+
+  const notifs = notifState.notifications || [];
+
+  // Tính số lượng theo bộ lọc
+  let countOrders = 0;
+  let countSystem = 0;
+  notifs.forEach(n => {
+    const meta = getNotificationMeta(n);
+    if (meta.isOrder) countOrders++;
+    else countSystem++;
+  });
+
+  const countAllEl = document.getElementById('seller-notif-count-all');
+  if (countAllEl) countAllEl.textContent = notifs.length;
+  const countOrdersEl = document.getElementById('seller-notif-count-orders');
+  if (countOrdersEl) countOrdersEl.textContent = countOrders;
+  const countSystemEl = document.getElementById('seller-notif-count-system');
+  if (countSystemEl) countSystemEl.textContent = countSystem;
+
+  const unreadCount = notifState.unreadCount || 0;
+  const badgeEl = document.getElementById('seller-dashboard-unread-badge');
+  if (badgeEl) {
+    if (unreadCount > 0) {
+      badgeEl.textContent = `${unreadCount} mới`;
+      badgeEl.style.display = 'inline-flex';
+    } else {
+      badgeEl.style.display = 'none';
+    }
+  }
+
+  // Áp dụng bộ lọc hiện tại
+  const filtered = notifs.filter(n => {
+    const meta = getNotificationMeta(n);
+    if (sellerNotifFilter === 'orders') return meta.isOrder;
+    if (sellerNotifFilter === 'system') return meta.isSystem;
+    return true;
+  });
+
+  if (!filtered.length) {
+    let emptyMsg = 'Chưa có thông báo nào trong mục này';
+    if (sellerNotifFilter === 'orders') emptyMsg = 'Chưa có thông báo đơn hàng mới từ khách hàng';
+    else if (sellerNotifFilter === 'system') emptyMsg = 'Chưa có thông báo từ hệ thống hoặc BQT BookHub';
+    
+    container.innerHTML = `
+      <div class="seller-notif-empty-state">
+        <div class="seller-notif-empty-icon">${sellerNotifFilter === 'orders' ? '📦' : (sellerNotifFilter === 'system' ? '⚙️' : '🔔')}</div>
+        <div class="seller-notif-empty-text">${emptyMsg}</div>
+        <div class="seller-notif-empty-sub">Khi khách đặt đơn, đánh giá sản phẩm hoặc hệ thống duyệt sách, thông báo sẽ tự động cập nhật tại đây.</div>
+      </div>
+    `;
+    return;
+  }
+
+  container.innerHTML = filtered.map(n => {
+    const meta = getNotificationMeta(n);
+    const timeAgo = formatTimeAgo(n.created_at);
+    const unreadClass = n.is_read ? '' : 'unread';
+
+    return `
+      <div class="seller-notif-feed-item ${unreadClass}" 
+           onclick="handleSellerNotifItemClick(${n.id}, '${n.type || ''}', ${n.reference_id || 'null'})"
+           role="button" tabindex="0">
+        <div class="seller-notif-feed-icon-wrap" style="background: ${meta.iconBg}; color: ${meta.iconColor};">
+          ${meta.icon}
+        </div>
+        <div class="seller-notif-feed-content">
+          <div class="seller-notif-feed-top">
+            <div class="seller-notif-feed-title-line">
+              <span class="seller-notif-tag ${meta.tagClass}">${meta.tagText}</span>
+              <span class="seller-notif-feed-title">${escapeHtml(n.title)}</span>
+            </div>
+            <div class="seller-notif-feed-time">
+              <span>🕒</span> ${timeAgo}
+            </div>
+          </div>
+          <div class="seller-notif-feed-message">${escapeHtml(n.message)}</div>
+          <div class="seller-notif-feed-bottom">
+            <span class="seller-notif-action-link">${meta.actionText}</span>
+            ${!n.is_read ? '<span class="seller-notif-feed-dot" title="Chưa đọc"></span>' : ''}
+          </div>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+/** Xử lý click vào item thông báo trên Dashboard NXB */
+async function handleSellerNotifItemClick(notifId, type, refId) {
+  const notif = notifState.notifications.find(n => n.id === notifId);
+  if (notif && !notif.is_read) {
+    notif.is_read = true;
+    notifState.unreadCount = Math.max(0, notifState.unreadCount - 1);
+    updateNotifBadge();
+    renderNotifList('seller');
+    renderSellerDashboardNotifs();
+
+    try {
+      await fetch(`/api/notifications/${notifId}/read`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${state.token}` }
+      });
+    } catch (e) {}
+  }
+
+  const meta = getNotificationMeta({ type, reference_id: refId });
+  if (meta.targetTab) {
+    switchSellerTab(meta.targetTab);
+    if (meta.targetTab === 'orders') {
+      showToast('Đã chuyển đến Quản lý Đơn hàng', 'info');
+    } else if (meta.targetTab === 'products') {
+      showToast('Đã chuyển đến Quản lý Sách & Kho', 'info');
+    } else if (meta.targetTab === 'settings') {
+      showToast('Đã chuyển đến Cài đặt Gian Hàng & Tài Chính', 'info');
+    }
+  } else {
+    showToast(notif ? notif.title : 'Đã xem thông báo', 'info');
+  }
+}
+
+/** Render danh sách thông báo trong dropdown Chuông Header */
 function renderNotifList(portal) {
   const listEl = document.getElementById(`${portal}-notif-list`);
   if (!listEl) return;
@@ -5351,22 +5670,22 @@ function renderNotifList(portal) {
   }
 
   listEl.innerHTML = notifState.notifications.map(n => {
-    const typeIcon = {
-      'NEW_BOOK_SUBMITTED': '📚',
-      'BOOK_APPROVED': '✅',
-      'BOOK_REJECTED': '❌'
-    }[n.type] || '🔔';
-
+    const meta = getNotificationMeta(n);
     const timeAgo = formatTimeAgo(n.created_at);
     const unreadClass = n.is_read ? '' : 'notif-item-unread';
 
     return `
       <div class="notif-item ${unreadClass}" 
-           onclick="handleNotifClick(${n.id}, ${n.reference_id || 'null'}, '${portal}')"
+           onclick="handleNotifClick(${n.id}, '${n.type || ''}', ${n.reference_id || 'null'}, '${portal}')"
            role="button" tabindex="0">
-        <div class="notif-item-icon">${typeIcon}</div>
+        <div class="notif-item-icon" style="background: ${meta.iconBg}; color: ${meta.iconColor}; border-radius: 8px; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; font-size: 16px;">
+          ${meta.icon}
+        </div>
         <div class="notif-item-body">
-          <div class="notif-item-title">${escapeHtml(n.title)}</div>
+          <div style="display:flex; align-items:center; gap:6px; margin-bottom:2px;">
+            <span class="seller-notif-tag ${meta.tagClass}" style="font-size:10px; padding:1px 6px;">${meta.tagText}</span>
+            <div class="notif-item-title" style="margin:0;">${escapeHtml(n.title)}</div>
+          </div>
           <div class="notif-item-message">${escapeHtml(n.message)}</div>
           <div class="notif-item-time">${timeAgo}</div>
         </div>
@@ -5378,6 +5697,11 @@ function renderNotifList(portal) {
 
 /** Toggle dropdown mở/đóng */
 function toggleNotifDropdown(portal) {
+  if (!state.currentUser || !state.token) {
+    showToast('Vui lòng đăng nhập để xem thông báo.', 'info');
+    showAuthPage();
+    return;
+  }
   const dropdown = document.getElementById(`${portal}-notif-dropdown`);
   if (!dropdown) return;
 
@@ -5411,7 +5735,7 @@ function toggleNotifDropdown(portal) {
 
 /** Đóng tất cả notification dropdown */
 function closeAllNotifDropdowns() {
-  ['seller', 'admin'].forEach(p => {
+  ['seller', 'admin', 'header'].forEach(p => {
     const dd = document.getElementById(`${p}-notif-dropdown`);
     if (dd) dd.style.display = 'none';
   });
@@ -5419,11 +5743,9 @@ function closeAllNotifDropdowns() {
 }
 
 /**
- * Xử lý click vào một thông báo:
- * 1. Đánh dấu đã đọc (gọi API)
- * 2. Chuyển hướng tới sách nếu có reference_id
+ * Xử lý click vào một thông báo từ Header dropdown
  */
-async function handleNotifClick(notifId, bookId, portal) {
+async function handleNotifClick(notifId, type, refId, portal) {
   // Đánh dấu đã đọc ngay trên UI (optimistic update)
   const notif = notifState.notifications.find(n => n.id === notifId);
   if (notif && !notif.is_read) {
@@ -5431,6 +5753,7 @@ async function handleNotifClick(notifId, bookId, portal) {
     notifState.unreadCount = Math.max(0, notifState.unreadCount - 1);
     updateNotifBadge();
     renderNotifList(portal);
+    renderSellerDashboardNotifs();
 
     // Gọi API trong background
     try {
@@ -5444,16 +5767,17 @@ async function handleNotifClick(notifId, bookId, portal) {
   // Đóng dropdown
   closeAllNotifDropdowns();
 
-  // Chuyển hướng tới sách liên quan
-  if (bookId) {
-    if (state.currentUser?.role === 'ADMIN') {
-      // Admin: mở trang quản lý sản phẩm
+  // Chuyển hướng thông minh theo vai trò và loại thông báo
+  const meta = getNotificationMeta({ type, reference_id: refId });
+  if (portal === 'seller') {
+    if (meta.targetTab) {
+      switchSellerTab(meta.targetTab);
+    }
+  } else if (portal === 'admin') {
+    if (meta.isOrder) {
+      switchAdminView('orders');
+    } else {
       switchAdminView('products');
-      showToast(`Đang tải thông tin sách #${bookId}...`, 'info');
-    } else if (state.currentUser?.role === 'SELLER') {
-      // NXB: chuyển sang tab Quản Lý Sách
-      switchSellerTab('products');
-      showToast(`Đang mở danh sách sách của bạn...`, 'info');
     }
   }
 }
@@ -5470,7 +5794,8 @@ async function markAllRead(portal) {
     notifState.notifications.forEach(n => n.is_read = true);
     notifState.unreadCount = 0;
     updateNotifBadge();
-    renderNotifList(portal);
+    renderNotifList(portal || 'seller');
+    renderSellerDashboardNotifs();
     showToast('Đã đánh dấu tất cả thông báo là đã đọc', 'success');
   } catch (e) {
     showToast('Không thể cập nhật thông báo', 'error');
@@ -5528,7 +5853,7 @@ const _origSwitchPortal = typeof switchPortal === 'function' ? switchPortal : nu
 if (_origSwitchPortal) {
   window.switchPortal = function(portal) {
     _origSwitchPortal(portal);
-    if (portal === 'SELLER' || portal === 'ADMIN') {
+    if (state.currentUser && state.token) {
       startNotifPolling();
     } else {
       stopNotifPolling();

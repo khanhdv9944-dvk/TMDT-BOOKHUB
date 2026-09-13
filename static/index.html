@@ -503,10 +503,22 @@
         <span>👑 Gói VIP Ebook</span>
       </button>
 
-      <!-- Nút Đơn hàng của tôi -->
-      <button class="role-btn" style="background:#f1f5f9; color:#1e293b; border-color:#cbd5e1;" onclick="openMyOrdersModal()">
-        🚚 Đơn Hàng
-      </button>
+      <!-- Nút Thông Báo trên Header -->
+      <div class="notif-bell-wrap" id="header-notif-wrap">
+        <button class="role-btn header-notif-btn" id="header-notif-btn" onclick="toggleNotifDropdown('header')" title="Thông báo mới">
+          🔔 Thông Báo
+          <span class="notif-badge" id="header-notif-badge" style="display:none;">0</span>
+        </button>
+        <div class="notif-dropdown" id="header-notif-dropdown" style="display:none;">
+          <div class="notif-dropdown-header">
+            <span>🔔 Thông Báo Mới</span>
+            <button class="notif-mark-all" onclick="markAllRead('header')">Đánh dấu đã đọc</button>
+          </div>
+          <div class="notif-list" id="header-notif-list">
+            <div class="notif-empty">Đang tải thông báo...</div>
+          </div>
+        </div>
+      </div>
 
       <!-- Giỏ hàng -->
       <div class="mini-cart-wrap">
@@ -863,6 +875,45 @@
             <div class="qa-val" style="color:#4338ca;">Mở rộng kho sách</div>
           </div>
           <span class="qa-arrow">→</span>
+        </div>
+      </div>
+
+      <!-- 🔔 TRUNG TÂM THÔNG BÁO GIAN HÀNG & HỆ THỐNG -->
+      <div class="seller-card-box seller-notif-center-box" style="margin-bottom: 24px;">
+        <div class="seller-card-header seller-notif-header">
+          <div class="seller-notif-title-group">
+            <div class="seller-notif-title-with-badge">
+              <span class="seller-notif-icon">🔔</span>
+              <h3 class="seller-card-title">Trung Tâm Thông Báo & Hoạt Động Gian Hàng</h3>
+              <span id="seller-dashboard-unread-badge" class="notif-count-pill" style="display:none;">0 mới</span>
+            </div>
+            <p class="seller-card-subtitle">Theo dõi đơn hàng của khách và các thông báo phê duyệt, cập nhật từ hệ thống BookHub</p>
+          </div>
+          
+          <div class="seller-notif-actions">
+            <div class="seller-notif-filter-pills">
+              <button class="seller-notif-pill-btn active" data-filter="all" onclick="setSellerNotifFilter('all', this)">
+                Tất cả (<span id="seller-notif-count-all">0</span>)
+              </button>
+              <button class="seller-notif-pill-btn" data-filter="orders" onclick="setSellerNotifFilter('orders', this)">
+                📦 Đơn hàng từ khách (<span id="seller-notif-count-orders">0</span>)
+              </button>
+              <button class="seller-notif-pill-btn" data-filter="system" onclick="setSellerNotifFilter('system', this)">
+                ⚙️ Hệ thống & Sàn (<span id="seller-notif-count-system">0</span>)
+              </button>
+            </div>
+            <div class="seller-notif-btn-group">
+              <button class="btn-sm btn-outline" onclick="markAllRead('seller')" title="Đánh dấu tất cả là đã đọc">✓ Đã đọc tất cả</button>
+              <button class="btn-sm btn-outline" onclick="fetchAndUpdateNotifications()" title="Làm mới danh sách thông báo">🔄 Làm mới</button>
+            </div>
+          </div>
+        </div>
+
+        <div id="seller-dashboard-notif-list" class="seller-dashboard-notif-list">
+          <div class="notif-loading">
+            <div class="notif-spinner"></div>
+            <span>Đang tải thông báo...</span>
+          </div>
         </div>
       </div>
 

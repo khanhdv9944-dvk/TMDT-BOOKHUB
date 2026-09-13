@@ -304,10 +304,22 @@
         <span>👑 Gói VIP Ebook</span>
       </button>
 
-      <!-- Nút Đơn hàng của tôi -->
-      <button class="role-btn" style="background:#f1f5f9; color:#1e293b; border-color:#cbd5e1;" onclick="openMyOrdersModal()">
-        🚚 Đơn Hàng
-      </button>
+      <!-- Nút Thông Báo trên Header -->
+      <div class="notif-bell-wrap" id="header-notif-wrap">
+        <button class="role-btn header-notif-btn" id="header-notif-btn" onclick="toggleNotifDropdown('header')" title="Thông báo mới">
+          🔔 Thông Báo
+          <span class="notif-badge" id="header-notif-badge" style="display:none;">0</span>
+        </button>
+        <div class="notif-dropdown" id="header-notif-dropdown" style="display:none;">
+          <div class="notif-dropdown-header">
+            <span>🔔 Thông Báo Mới</span>
+            <button class="notif-mark-all" onclick="markAllRead('header')">Đánh dấu đã đọc</button>
+          </div>
+          <div class="notif-list" id="header-notif-list">
+            <div class="notif-empty">Đang tải thông báo...</div>
+          </div>
+        </div>
+      </div>
 
       <!-- Giỏ hàng -->
       <div class="mini-cart-wrap">

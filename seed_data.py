@@ -97,6 +97,81 @@ def sync_reference_catalog(db):
         added += 1
     return added
 
+def sync_sample_notifications(db):
+    """Đảm bảo NXB có các thông báo mẫu về đơn hàng và hệ thống nếu chưa có."""
+    nhanam = db.query(models.User).filter(models.User.username == "nxb_nhanam").first()
+    if not nhanam:
+        return
+    
+    existing_count = db.query(models.Notification).filter(models.Notification.user_id == nhanam.id).count()
+    if existing_count == 0:
+        order = db.query(models.Order).first()
+        order_code = order.order_code if order else "BH-260824-A182C3"
+        order_id = order.id if order else 1
+        book = db.query(models.Book).filter(models.Book.seller_id == nhanam.id).first()
+        book_id = book.id if book else 1
+        book_title = book.title if book else "Bốn Cấp Độ Chữa Lành"
+        
+        now_utc = datetime.datetime.utcnow()
+        notifs = [
+            models.Notification(
+                user_id=nhanam.id,
+                title="Đơn hàng mới từ khách hàng",
+                message=f"Bạn có đơn hàng mới #{order_code} từ khách hàng Nguyễn Văn An (Tổng tiền: 214.000 đ). Vui lòng chuẩn bị đóng gói.",
+                type=models.NotificationType.ORDER_CREATED.value,
+                reference_id=order_id,
+                is_read=False,
+                created_at=now_utc - datetime.timedelta(minutes=15)
+            ),
+            models.Notification(
+                user_id=nhanam.id,
+                title="Khách hàng đã nhận hàng thành công",
+                message=f"Khách hàng Trần Minh Thư đã xác nhận nhận thành công đơn hàng #{order_code}. Doanh thu 192.600 đ đã cộng vào số dư ví.",
+                type=models.NotificationType.ORDER_DELIVERED.value,
+                reference_id=order_id,
+                is_read=False,
+                created_at=now_utc - datetime.timedelta(hours=2)
+            ),
+            models.Notification(
+                user_id=nhanam.id,
+                title="Cảnh báo tồn kho thấp",
+                message=f"Cuốn sách '{book_title}' trong kho của bạn chỉ còn tồn kho 4 cuốn (ngưỡng an toàn: 5 cuốn). Hãy bổ sung thêm hàng.",
+                type=models.NotificationType.LOW_STOCK_ALERT.value,
+                reference_id=book_id,
+                is_read=False,
+                created_at=now_utc - datetime.timedelta(hours=5)
+            ),
+            models.Notification(
+                user_id=nhanam.id,
+                title="Đánh giá 5 sao từ khách hàng",
+                message=f"Khách hàng Trần Minh Thư vừa đánh giá ⭐⭐⭐⭐⭐ cho đơn #{order_code}: 'Sách đóng gói cực kỳ cẩn thận, bìa cứng cáp và giao hàng siêu nhanh!'",
+                type=models.NotificationType.ORDER_REVIEWED.value,
+                reference_id=order_id,
+                is_read=True,
+                created_at=now_utc - datetime.timedelta(hours=8)
+            ),
+            models.Notification(
+                user_id=nhanam.id,
+                title="Sách đã được phê duyệt",
+                message=f"Cuốn sách '{book_title}' của bạn đã được Admin duyệt và chính thức mở bán trên sàn BookHub!",
+                type=models.NotificationType.BOOK_APPROVED.value,
+                reference_id=book_id,
+                is_read=True,
+                created_at=now_utc - datetime.timedelta(days=1)
+            ),
+            models.Notification(
+                user_id=nhanam.id,
+                title="Thông báo từ Ban Quản Trị BookHub",
+                message="BookHub triển khai chương trình 'Tháng Vàng Tri Ân Độc Giả' - Trợ giá 50% phí vận chuyển toàn quốc cho các gian hàng NXB chính hãng.",
+                type=models.NotificationType.SYSTEM_ANNOUNCEMENT.value,
+                reference_id=None,
+                is_read=False,
+                created_at=now_utc - datetime.timedelta(hours=12)
+            ),
+        ]
+        db.add_all(notifs)
+        db.commit()
+
 def seed_database():
     # Tạo tất cả các bảng nếu chưa có
     Base.metadata.create_all(bind=engine)
@@ -114,6 +189,7 @@ def seed_database():
         # Kiểm tra nếu đã có dữ liệu thì không seed lại
         if db.query(models.User).first():
             added = sync_reference_catalog(db)
+            sync_sample_notifications(db)
             db.commit()
             print("Cơ sở dữ liệu đã tồn tại dữ liệu!")
             if added:
@@ -532,6 +608,67 @@ Tôi rất tự hào vì đôi càng tôi mẫm bóng, vuốt ở chân cứ c�
             book_cover=books_data[1].cover_image
         )
         db.add(item2_1)
+        db.flush()
+
+        # Khởi tạo danh sách thông báo mẫu cho NXB (Đơn hàng từ khách & Hệ thống)
+        now_utc = datetime.datetime.utcnow()
+        sample_notifs = [
+            models.Notification(
+                user_id=nxb_nhanam.id,
+                title="Đơn hàng mới từ khách hàng",
+                message=f"Bạn có đơn hàng mới #{order1.order_code} từ khách hàng Nguyễn Văn An (Tổng tiền: 214.000 đ). Vui lòng chuẩn bị đóng gói.",
+                type=models.NotificationType.ORDER_CREATED.value,
+                reference_id=order1.id,
+                is_read=False,
+                created_at=now_utc - datetime.timedelta(minutes=15)
+            ),
+            models.Notification(
+                user_id=nxb_nhanam.id,
+                title="Khách hàng đã nhận hàng thành công",
+                message="Khách hàng Trần Minh Thư đã xác nhận nhận thành công đơn hàng #BH-260824-B994F1. Doanh thu 192.600 đ đã cộng vào số dư ví.",
+                type=models.NotificationType.ORDER_DELIVERED.value,
+                reference_id=order1.id,
+                is_read=False,
+                created_at=now_utc - datetime.timedelta(hours=2)
+            ),
+            models.Notification(
+                user_id=nxb_nhanam.id,
+                title="Cảnh báo tồn kho thấp",
+                message="Cuốn sách 'Đứa Trẻ Cát' trong kho của bạn chỉ còn tồn kho 4 cuốn (ngưỡng an toàn: 5 cuốn). Hãy bổ sung thêm hàng.",
+                type=models.NotificationType.LOW_STOCK_ALERT.value,
+                reference_id=books_data[0].id if books_data else None,
+                is_read=False,
+                created_at=now_utc - datetime.timedelta(hours=5)
+            ),
+            models.Notification(
+                user_id=nxb_nhanam.id,
+                title="Đánh giá 5 sao từ khách hàng",
+                message="Khách hàng Trần Minh Thư vừa đánh giá ⭐⭐⭐⭐⭐: 'Sách đóng gói cực kỳ cẩn thận, bìa cứng cáp và giao hàng siêu nhanh!'",
+                type=models.NotificationType.ORDER_REVIEWED.value,
+                reference_id=order1.id,
+                is_read=True,
+                created_at=now_utc - datetime.timedelta(hours=8)
+            ),
+            models.Notification(
+                user_id=nxb_nhanam.id,
+                title="Sách đã được phê duyệt",
+                message=f"Cuốn sách '{books_data[0].title if books_data else 'Sách mới'}' của bạn đã được Admin duyệt và chính thức mở bán trên sàn!",
+                type=models.NotificationType.BOOK_APPROVED.value,
+                reference_id=books_data[0].id if books_data else None,
+                is_read=True,
+                created_at=now_utc - datetime.timedelta(days=1)
+            ),
+            models.Notification(
+                user_id=nxb_nhanam.id,
+                title="Thông báo từ Ban Quản Trị BookHub",
+                message="BookHub triển khai chương trình 'Tháng Vàng Tri Ân Độc Giả' - Trợ giá 50% phí vận chuyển toàn quốc cho các gian hàng NXB chính hãng.",
+                type=models.NotificationType.SYSTEM_ANNOUNCEMENT.value,
+                reference_id=None,
+                is_read=False,
+                created_at=now_utc - datetime.timedelta(hours=12)
+            ),
+        ]
+        db.add_all(sample_notifs)
 
         db.commit()
         added = sync_reference_catalog(db)

@@ -4480,6 +4480,27 @@ body { background: #f3f4f6; }
   align-items: center;
 }
 
+.header-notif-btn {
+  position: relative;
+  background: #f1f5f9;
+  color: #1e293b;
+  border: 1px solid #cbd5e1;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 700;
+  padding: 8px 16px;
+  border-radius: 20px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.header-notif-btn:hover {
+  background: #e2e8f0;
+  color: #4f46e5;
+  border-color: #c7d2fe;
+}
+
 /* --- Bell Button --- */
 .notif-bell-btn {
   position: relative;
@@ -4878,6 +4899,432 @@ body { background: #f3f4f6; }
     width: calc(100vw - 24px);
     right: -60px;
   }
+}
+
+/* =============================================================================
+   TRUNG TÂM THÔNG BÁO GIAN HÀNG NXB (SELLER DASHBOARD NOTIFICATION CENTER)
+   ============================================================================= */
+.seller-notif-center-box {
+  background: #ffffff;
+  border-radius: 16px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04), 0 1px 3px rgba(0, 0, 0, 0.02);
+  border: 1px solid rgba(226, 232, 240, 0.8);
+  overflow: hidden;
+  transition: all 0.3s ease;
+}
+
+.seller-notif-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 16px;
+  padding: 18px 24px;
+  background: linear-gradient(180deg, #f8fafc 0%, #ffffff 100%);
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.seller-notif-title-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.seller-notif-title-with-badge {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.seller-notif-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  background: #eef2ff;
+  color: #4f46e5;
+  font-size: 16px;
+  box-shadow: 0 2px 6px rgba(79, 70, 229, 0.15);
+}
+
+.notif-count-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  background: #ef4444;
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 700;
+  border-radius: 20px;
+  box-shadow: 0 2px 6px rgba(239, 68, 68, 0.3);
+  animation: pulseBadge 2s infinite ease-in-out;
+}
+
+@keyframes pulseBadge {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.06); }
+}
+
+.seller-notif-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.seller-notif-filter-pills {
+  display: flex;
+  background: #f1f5f9;
+  padding: 4px;
+  border-radius: 10px;
+  gap: 4px;
+}
+
+.seller-notif-pill-btn {
+  border: none;
+  background: transparent;
+  padding: 6px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #64748b;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.seller-notif-pill-btn:hover {
+  color: #1e293b;
+  background: rgba(255, 255, 255, 0.6);
+}
+
+.seller-notif-pill-btn.active {
+  background: #ffffff;
+  color: #4f46e5;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
+}
+
+.seller-notif-btn-group {
+  display: flex;
+  gap: 8px;
+}
+
+/* Dashboard Notification List Container */
+.seller-dashboard-notif-list {
+  max-height: 480px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
+  display: flex;
+  flex-direction: column;
+}
+
+.seller-dashboard-notif-list::-webkit-scrollbar {
+  width: 6px;
+}
+.seller-dashboard-notif-list::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 6px;
+}
+
+/* Individual Feed Item */
+.seller-notif-feed-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 16px 24px;
+  border-bottom: 1px solid #f1f5f9;
+  cursor: pointer;
+  position: relative;
+  transition: all 0.2s ease;
+  background: #ffffff;
+}
+
+.seller-notif-feed-item:last-child {
+  border-bottom: none;
+}
+
+.seller-notif-feed-item:hover {
+  background: #f8fafc;
+  transform: translateX(3px);
+}
+
+.seller-notif-feed-item.unread {
+  background: #f5f8ff;
+  border-left: 3px solid #4f46e5;
+}
+
+.seller-notif-feed-item.unread:hover {
+  background: #eef4ff;
+}
+
+.seller-notif-feed-icon-wrap {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  flex-shrink: 0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.seller-notif-feed-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.seller-notif-feed-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 4px;
+  flex-wrap: wrap;
+}
+
+.seller-notif-feed-title-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.seller-notif-feed-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.seller-notif-feed-item.unread .seller-notif-feed-title {
+  color: #0f172a;
+}
+
+.seller-notif-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+/* Tag Variants */
+.seller-notif-tag.tag-order-new {
+  background: #ecfdf5;
+  color: #059669;
+  border: 1px solid #a7f3d0;
+}
+.seller-notif-tag.tag-order-process {
+  background: #fef3c7;
+  color: #d97706;
+  border: 1px solid #fde68a;
+}
+.seller-notif-tag.tag-order-success {
+  background: #f0fdf4;
+  color: #16a34a;
+  border: 1px solid #bbf7d0;
+}
+.seller-notif-tag.tag-order-review {
+  background: #fffbeb;
+  color: #b45309;
+  border: 1px solid #fef3c7;
+}
+.seller-notif-tag.tag-order-return {
+  background: #fff1f2;
+  color: #e11d48;
+  border: 1px solid #fecdd3;
+}
+.seller-notif-tag.tag-system-approved {
+  background: #eef2ff;
+  color: #4f46e5;
+  border: 1px solid #c7d2fe;
+}
+.seller-notif-tag.tag-system-rejected {
+  background: #fef2f2;
+  color: #dc2626;
+  border: 1px solid #fecaca;
+}
+.seller-notif-tag.tag-system-alert {
+  background: #fff7ed;
+  color: #ea580c;
+  border: 1px solid #ffedd5;
+}
+.seller-notif-tag.tag-system-payout {
+  background: #f0fdfa;
+  color: #0d9488;
+  border: 1px solid #ccfbf1;
+}
+.seller-notif-tag.tag-system-notice {
+  background: #f8fafc;
+  color: #475569;
+  border: 1px solid #e2e8f0;
+}
+
+.seller-notif-feed-time {
+  font-size: 12px;
+  color: #94a3b8;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.seller-notif-feed-message {
+  font-size: 13.5px;
+  color: #475569;
+  line-height: 1.5;
+  margin-bottom: 8px;
+}
+
+.seller-notif-feed-bottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.seller-notif-action-link {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #4f46e5;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: color 0.15s ease;
+}
+
+.seller-notif-action-link:hover {
+  color: #3730a3;
+  text-decoration: underline;
+}
+
+.seller-notif-feed-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #4f46e5;
+  box-shadow: 0 0 8px rgba(79, 70, 229, 0.6);
+  flex-shrink: 0;
+}
+
+/* Empty State */
+.seller-notif-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 24px;
+  text-align: center;
+  color: #64748b;
+}
+
+.seller-notif-empty-icon {
+  font-size: 44px;
+  margin-bottom: 12px;
+  opacity: 0.8;
+}
+
+.seller-notif-empty-text {
+  font-size: 15px;
+  font-weight: 600;
+  color: #334155;
+  margin-bottom: 4px;
+}
+
+.seller-notif-empty-sub {
+  font-size: 13px;
+  color: #94a3b8;
+}
+
+/* Loading state */
+.notif-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 40px;
+  color: #64748b;
+  font-size: 14px;
+}
+
+.notif-spinner {
+  width: 20px;
+  height: 20px;
+  border: 2px solid #e2e8f0;
+  border-top-color: #4f46e5;
+  border-radius: 50%;
+  animation: notifSpin 0.7s linear infinite;
+}
+
+@keyframes notifSpin {
+  to { transform: rotate(360deg); }
+}
+
+/* Dark mode for seller notification center */
+.dark-mode .seller-notif-center-box {
+  background: #1e293b;
+  border-color: #334155;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+}
+
+.dark-mode .seller-notif-header {
+  background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
+  border-bottom-color: #334155;
+}
+
+.dark-mode .seller-notif-filter-pills {
+  background: #0f172a;
+}
+
+.dark-mode .seller-notif-pill-btn {
+  color: #94a3b8;
+}
+
+.dark-mode .seller-notif-pill-btn:hover {
+  color: #e2e8f0;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.dark-mode .seller-notif-pill-btn.active {
+  background: #334155;
+  color: #818cf8;
+}
+
+.dark-mode .seller-notif-feed-item {
+  background: #1e293b;
+  border-bottom-color: #334155;
+}
+
+.dark-mode .seller-notif-feed-item:hover {
+  background: #283548;
+}
+
+.dark-mode .seller-notif-feed-item.unread {
+  background: #1e2439;
+  border-left-color: #818cf8;
+}
+
+.dark-mode .seller-notif-feed-item.unread:hover {
+  background: #242c47;
+}
+
+.dark-mode .seller-notif-feed-title {
+  color: #f1f5f9;
+}
+
+.dark-mode .seller-notif-feed-message {
+  color: #cbd5e1;
+}
+
+.dark-mode .seller-notif-empty-text {
+  color: #e2e8f0;
 }
 /* Buyer storefront mobile layout. Desktop rules above remain unchanged. */
 @media (max-width: 767px) {
