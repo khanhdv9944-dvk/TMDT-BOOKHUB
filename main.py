@@ -1,6 +1,6 @@
 import os
 from pathlib import Path
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -68,11 +68,22 @@ def admin_shell(admin_path: str = ""):
 
 @app.get("/terms", include_in_schema=False)
 def terms_page():
-    return FileResponse(str(STATIC_DIR / "terms.html"))
+    return frontend_shell()
 
 @app.get("/privacy", include_in_schema=False)
 def privacy_page():
-    return FileResponse(str(STATIC_DIR / "privacy.html"))
+    return frontend_shell()
+
+@app.get("/{content_path:path}", include_in_schema=False)
+def content_page_shell(content_path: str):
+    allowed_paths = {
+        "login", "register", "bookstores", "account", "account/addresses", "account/history", "account/orders",
+        "support/terms", "support/privacy", "support/payment-security", "support/about", "support/returns",
+        "support/warranty", "support/shipping", "support/wholesale", "support/faq", "support/contact",
+    }
+    if content_path in allowed_paths:
+        return frontend_shell()
+    raise HTTPException(status_code=404, detail="Không tìm thấy trang")
 
 if __name__ == "__main__":
     import uvicorn

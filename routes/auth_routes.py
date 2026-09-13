@@ -77,6 +77,17 @@ def get_current_user_profile(current_user: models.User = Depends(auth.get_curren
 
 
 @router.patch("/me", response_model=schemas.UserOut)
+def update_current_user_profile(
+    profile: schemas.UserProfileUpdate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.get_current_user),
+):
+    for field, value in profile.model_dump(exclude_unset=True).items():
+        setattr(current_user, field, value)
+    db.commit()
+    db.refresh(current_user)
+
+@router.patch("/me", response_model=schemas.UserOut)
 def update_current_user_profile(profile: schemas.UserProfileUpdate, db: Session = Depends(get_db), current_user: models.User = Depends(auth.get_current_user)):
     for field, value in profile.model_dump(exclude_unset=True).items():
         setattr(current_user, field, value)

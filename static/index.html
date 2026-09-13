@@ -203,8 +203,8 @@
 
           <p class="auth-terms">
             Bằng việc tạo tài khoản, bạn đồng ý với
-            <a href="#" onclick="event.preventDefault(); showPolicyPage('terms')">Điều khoản dịch vụ</a> và
-            <a href="#" onclick="event.preventDefault(); showPolicyPage('privacy')">Chính sách bảo mật</a> của BookHub.
+            <a href="/support/terms">Điều khoản dịch vụ</a> và
+            <a href="/support/privacy">Chính sách bảo mật</a> của BookHub.
           </p>
         </form>
 
@@ -409,13 +409,13 @@
             <div class="terms-box compact-terms">
               <label class="check-row">
                 <input id="seller-terms-service" type="checkbox">
-                <span>Tôi đã đọc và đồng ý với <a href="#" onclick="event.preventDefault(); showPolicyPage('terms')">Điều khoản dịch vụ</a> của BookHub. <span class="required-star">*</span></span>
+                <span>Tôi đã đọc và đồng ý với <a href="/support/terms">Điều khoản dịch vụ</a> của BookHub. <span class="required-star">*</span></span>
               </label>
             </div>
             <div class="terms-box compact-terms">
               <label class="check-row">
                 <input id="seller-privacy-policy" type="checkbox">
-                <span>Tôi đã đọc và đồng ý với <a href="#" onclick="event.preventDefault(); showPolicyPage('privacy')">Chính sách bảo mật</a> của BookHub. <span class="required-star">*</span></span>
+                <span>Tôi đã đọc và đồng ý với <a href="/support/privacy">Chính sách bảo mật</a> của BookHub. <span class="required-star">*</span></span>
               </label>
             </div>
           </div>
@@ -1492,28 +1492,36 @@
         </div>
         <p>BookHub là nền tảng sách trực tuyến, kết nối độc giả với những thương hiệu sách uy tín và nội dung giá trị.</p>
       </div>
-      <div>
-        <h4>Về BookHub</h4>
+      <div class="footer-link-group">
+        <button class="footer-group-toggle" type="button" aria-expanded="true">DỊCH VỤ <span>⌄</span></button>
         <ul>
-          <li>Giới thiệu</li>
-          <li>Liên hệ</li>
-          <li>Điều khoản</li>
+          <li><a href="/support/terms">Điều khoản sử dụng</a></li>
+          <li><a href="/support/privacy">Bảo mật thông tin cá nhân</a></li>
+          <li><a href="/support/payment-security">Bảo mật thanh toán</a></li>
+          <li><a href="/support/about">Giới thiệu sàn</a></li>
+          <li><a href="/bookstores">Hệ thống nhà sách</a></li>
         </ul>
       </div>
-      <div>
-        <h4>Danh mục sách</h4>
+      <div class="footer-link-group">
+        <button class="footer-group-toggle" type="button" aria-expanded="true">HỖ TRỢ <span>⌄</span></button>
         <ul>
-          <li>Văn học</li>
-          <li>Kinh tế</li>
-          <li>Kỹ năng sống</li>
+          <li><a href="/support/returns">Đổi - trả - hoàn tiền</a></li>
+          <li><a href="/support/warranty">Bảo hành - bồi hoàn</a></li>
+          <li><a href="/support/shipping">Chính sách vận chuyển</a></li>
+          <li><a href="/support/wholesale">Chính sách khách sỉ</a></li>
+          <li><a href="/support/faq">Câu hỏi thường gặp</a></li>
+          <li><a href="/support/contact">Liên hệ hỗ trợ</a></li>
         </ul>
       </div>
-      <div>
-        <h4>Thông tin liên hệ</h4>
+      <div class="footer-link-group">
+        <button class="footer-group-toggle" type="button" aria-expanded="true">TÀI KHOẢN CỦA TÔI <span>⌄</span></button>
         <ul>
-          <li>Hotline: 1900 1234</li>
-          <li>Email: support@bookhub.vn</li>
-          <li>Địa chỉ: TP.HCM</li>
+          <li><a href="/login" data-account-action="login">Đăng nhập / Tạo tài khoản</a></li>
+          <li><a href="/account">Thông tin tài khoản</a></li>
+          <li><a href="/account/addresses">Thay đổi địa chỉ</a></li>
+          <li><a href="/account/history">Lịch sử mua hàng</a></li>
+          <li><a href="/account/orders">Đơn hàng của tôi</a></li>
+          <li><button type="button" id="footer-logout-link" class="footer-action-link" style="display:none;">Đăng xuất</button></li>
         </ul>
       </div>
     </div>

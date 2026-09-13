@@ -11,6 +11,20 @@ router = APIRouter(prefix="/api/books", tags=["Books"])
 def get_categories(db: Session = Depends(get_db)):
     return db.query(models.Category).all()
 
+
+@router.get("/sellers")
+def list_public_sellers(db: Session = Depends(get_db)):
+    sellers = db.query(models.User).filter(
+        models.User.role == models.UserRole.SELLER.value,
+        models.User.status.in_([models.UserStatus.ACTIVE.value, models.UserStatus.APPROVED.value]),
+    ).order_by(models.User.shop_name, models.User.full_name).all()
+    return [{
+        "id": seller.id,
+        "shop_name": seller.shop_name or seller.full_name or seller.username,
+        "description": seller.shop_description,
+        "logo": seller.shop_logo or seller.avatar,
+        "book_count": sum(1 for book in seller.books if book.status == models.BookStatus.APPROVED.value),
+    } for seller in sellers]
 @router.get("", response_model=List[schemas.BookOut])
 def list_books(
     q: Optional[str] = Query(None, description="Tìm theo tên sách hoặc tác giả"),

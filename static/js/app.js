@@ -129,6 +129,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     state.token = null;
     showPublicMarketplace();
   }
+  initFooterNavigation();
+  if (await handleContentRoute()) return;
   if (window.location.pathname.match(/^\/books\/\d+$/)) handleBookHistoryNavigation();
 });
 
@@ -490,6 +492,7 @@ function renderUserProfileWidget() {
   const widget = document.getElementById('user-profile-widget');
   const guestActions = document.getElementById('guest-auth-inline');
   const logoutBtn = document.getElementById('logout-btn');
+  const footerLogout = document.getElementById('footer-logout-link');
 
   if (!widget) return;
 
@@ -502,6 +505,7 @@ function renderUserProfileWidget() {
     `;
     if (guestActions) guestActions.style.display = 'flex';
     if (logoutBtn) logoutBtn.style.display = 'none';
+    if (footerLogout) footerLogout.style.display = 'none';
     return;
   }
 
@@ -3772,8 +3776,307 @@ function clearFileInput(inputId, metaId, stateKey) {
 }
 
 function showPolicyPage(type) {
-  const url = type === 'terms' ? '/terms' : '/privacy';
-  window.location.href = url;
+  navigateContentPage(type === 'terms' ? '/support/terms' : '/support/privacy');
+}
+
+const supportPageContent = {
+  '/support/terms': {
+    title: 'Điều khoản sử dụng', eyebrow: 'BOOKHUB · PHÁP LÝ',
+    intro: 'Điều khoản áp dụng cho độc giả, nhà xuất bản và nhà sách khi sử dụng nền tảng BookHub.',
+    sections: [
+      ['1. Giới thiệu và phạm vi áp dụng', 'BookHub là sàn thương mại điện tử kết nối người mua với nhà xuất bản, nhà sách và người bán sách. Điều khoản này áp dụng cho mọi hoạt động truy cập, đăng ký, mua bán, thanh toán, giao nhận, đánh giá và sử dụng nội dung trên website.'],
+      ['2. Điều kiện sử dụng website', 'Người dùng phải cung cấp thông tin trung thực, đủ năng lực hành vi dân sự theo quy định pháp luật và tự chịu trách nhiệm bảo vệ tài khoản. Không được dùng website để phá hoại hệ thống, phát tán mã độc, thu thập dữ liệu trái phép hoặc tạo giao dịch giả.'],
+      ['3. Quyền và nghĩa vụ của khách hàng', 'Khách hàng được tìm kiếm, đọc thử, đặt mua, theo dõi đơn, đánh giá và yêu cầu hỗ trợ. Khách hàng cần kiểm tra thông tin đơn, cung cấp địa chỉ hợp lệ, nhận hàng đúng hẹn và không lợi dụng chính sách đổi trả.'],
+      ['4. Quyền và nghĩa vụ của người bán', 'Người bán chịu trách nhiệm về nguồn gốc, chất lượng, mô tả, giá, tồn kho, đóng gói và giao hàng của sách. Người bán phải xử lý đơn, phản hồi yêu cầu đổi trả và tuân thủ quy định chống sách giả của BookHub.'],
+      ['5. Sản phẩm và giá bán', 'Sách phải có thông tin chính xác về tên, tác giả, nhà xuất bản, định dạng, tình trạng và giá. Giá hiển thị là giá bán tại thời điểm đặt hàng; khuyến mãi chỉ có hiệu lực trong thời gian và điều kiện được công bố.'],
+      ['6. Đặt hàng, thanh toán và vận chuyển', 'Đơn hàng chỉ được xác nhận sau khi hệ thống ghi nhận thành công. BookHub hỗ trợ COD, VietQR và các phương thức hiển thị tại checkout. Phí và thời gian giao phụ thuộc phương thức, khu vực và tình trạng vận chuyển thực tế.'],
+      ['7. Hủy đơn, đổi trả và hoàn tiền', 'Đơn có thể được hủy khi chưa chuyển sang trạng thái không thể hủy. Sách lỗi, hư hỏng, giao sai, thiếu sản phẩm hoặc không đúng mô tả được tiếp nhận theo Chính sách đổi trả - hoàn tiền và quy trình kiểm tra thực tế.'],
+      ['8. Đánh giá sản phẩm và nội dung người dùng', 'Đánh giá phải phản ánh trải nghiệm thật, không chứa nội dung xúc phạm, quảng cáo, thông tin cá nhân hoặc thao túng xếp hạng. BookHub có thể ẩn nội dung vi phạm và phối hợp xử lý tranh chấp.'],
+      ['9. Tài khoản, sở hữu trí tuệ và hành vi bị cấm', 'Tài khoản, thương hiệu, giao diện, dữ liệu và nội dung do BookHub cung cấp thuộc quyền của BookHub hoặc bên cấp phép. Nghiêm cấm giả mạo, bán hàng giả, gian lận thanh toán, lạm dụng voucher, sao chép nội dung hoặc can thiệp trái phép vào hệ thống.'],
+      ['10. Giới hạn trách nhiệm và thay đổi điều khoản', 'BookHub nỗ lực duy trì dịch vụ liên tục nhưng không chịu trách nhiệm cho gián đoạn do sự kiện bất khả kháng hoặc thông tin sai từ người dùng/người bán. Điều khoản có thể được cập nhật; phiên bản mới có hiệu lực khi được đăng trên website.'],
+      ['11. Thông tin liên hệ', 'Bộ phận hỗ trợ tiếp nhận yêu cầu qua trang Liên hệ hỗ trợ, email support@bookhub.vn và hotline 1900 1234 trong giờ hành chính.']
+    ]
+  },
+  '/support/privacy': {
+    title: 'Chính sách bảo mật thông tin cá nhân', eyebrow: 'BOOKHUB · BẢO MẬT',
+    intro: 'BookHub chỉ thu thập và sử dụng dữ liệu cần thiết để vận hành tài khoản, đơn hàng và hỗ trợ khách hàng.',
+    sections: [
+      ['1. Thông tin được thu thập', 'Thông tin đăng ký gồm tên, email, số điện thoại và thông tin tài khoản. Khi đặt hàng, hệ thống xử lý địa chỉ giao, sản phẩm, giá trị đơn, trạng thái thanh toán và vận chuyển.'],
+      ['2. Mục đích sử dụng', 'Dữ liệu được dùng để xác thực tài khoản, xử lý đơn, giao hàng, hỗ trợ, chống gian lận, cải thiện trải nghiệm, gửi thông báo dịch vụ và thực hiện nghĩa vụ pháp lý.'],
+      ['3. Cookies và dữ liệu thiết bị', 'BookHub sử dụng bộ nhớ trình duyệt cho phiên đăng nhập, giỏ hàng và tùy chọn giao diện. Cookie cần thiết giúp website hoạt động; người dùng có thể quản lý cookie trong trình duyệt.'],
+      ['4. Bảo mật và chia sẻ dữ liệu', 'Dữ liệu được bảo vệ bằng kiểm soát truy cập và kết nối phù hợp. BookHub chỉ chia sẻ phần cần thiết với đơn vị vận chuyển, thanh toán, nhà cung cấp hạ tầng hoặc cơ quan có thẩm quyền khi pháp luật yêu cầu; không bán dữ liệu cá nhân.'],
+      ['5. Thời gian lưu trữ', 'Dữ liệu được lưu trong thời gian tài khoản và giao dịch còn cần thiết, hoặc theo thời hạn pháp luật yêu cầu. Một số dữ liệu giao dịch có thể được lưu để đối soát và giải quyết tranh chấp.'],
+      ['6. Quyền của người dùng', 'Người dùng có quyền xem, chỉnh sửa, yêu cầu xóa hoặc hạn chế xử lý dữ liệu theo quy định. Yêu cầu có thể gửi qua trang Liên hệ hỗ trợ từ đúng email tài khoản để xác minh.'],
+      ['7. Liên hệ về bảo mật', 'Gửi yêu cầu bảo mật tới support@bookhub.vn với tiêu đề “Yêu cầu bảo mật BookHub”. Không gửi mật khẩu, mã OTP hoặc dữ liệu thẻ trong email.']
+    ]
+  },
+  '/support/payment-security': {
+    title: 'Chính sách bảo mật thanh toán', eyebrow: 'BOOKHUB · THANH TOÁN',
+    intro: 'BookHub thiết kế quy trình thanh toán theo nguyên tắc chỉ xử lý dữ liệu cần thiết và không lưu thông tin thẻ trong giao diện ứng dụng.',
+    sections: [
+      ['1. Phương thức thanh toán', 'Khách hàng có thể chọn COD, VietQR, MoMo, ZaloPay, ShopeePay hoặc ATM/Visa/Mastercard nếu phương thức được bật tại checkout.'],
+      ['2. Quy trình và bảo mật giao dịch', 'Sau khi khách xác nhận đơn, hệ thống tạo giao dịch và ghi nhận trạng thái. Thông tin thanh toán nhạy cảm được xử lý bởi kênh thanh toán tương ứng; BookHub không yêu cầu khách nhập mật khẩu ngân hàng vào website.'],
+      ['3. Giao dịch thất bại hoặc trùng', 'Nếu giao dịch thất bại, khách không nên thanh toán lại liên tục; hãy kiểm tra trạng thái đơn và liên hệ hỗ trợ. Với giao dịch bị trùng, BookHub đối soát theo mã giao dịch và phối hợp bên thanh toán để hoàn tiền.'],
+      ['4. Hoàn tiền và trách nhiệm', 'Hoàn tiền được thực hiện theo trạng thái đơn, chính sách đổi trả và kênh thanh toán ban đầu khi có thể. Khách hàng cần bảo mật thiết bị, mã xác thực và kiểm tra đúng tên miền trước khi thanh toán.'],
+      ['5. Hỗ trợ lỗi thanh toán', 'Khi liên hệ, chỉ cung cấp mã đơn, thời điểm, phương thức và số tiền giao dịch đã che bớt. Không gửi số thẻ đầy đủ, CVV, OTP hoặc mật khẩu.']
+    ]
+  },
+  '/support/about': {
+    title: 'Giới thiệu BookHub', eyebrow: 'VỀ BOOKHUB',
+    intro: 'BookHub là marketplace chuyên về sách, kết nối độc giả với nhà xuất bản và nhà sách uy tín trên một nền tảng minh bạch.',
+    sections: [
+      ['Sàn sách dành cho độc giả', 'BookHub giúp người đọc tìm sách theo thể loại, tác giả, nhà xuất bản và nhu cầu đọc. Sách giấy, Ebook và chương trình VIP được tổ chức trong cùng trải nghiệm mua sắm.'],
+      ['Giá trị cho người mua', 'Thông tin sách rõ ràng, đọc thử trước khi mua, nhiều phương thức thanh toán, theo dõi giao hàng, hỗ trợ đổi trả và đánh giá sau mua giúp khách hàng ra quyết định tự tin hơn.'],
+      ['Đồng hành cùng nhà xuất bản và nhà sách', 'Người bán có công cụ quản lý catalog, tồn kho, đơn hàng, marketing, doanh thu và chăm sóc độc giả. BookHub ưu tiên quy trình xét duyệt và thông tin nguồn gốc để xây dựng thị trường sách lành mạnh.'],
+      ['Cam kết dịch vụ', 'BookHub hướng tới sản phẩm chính hãng, giao nhận minh bạch, hỗ trợ phản hồi nhanh và bảo vệ dữ liệu cá nhân.']
+    ]
+  },
+  '/support/returns': {
+    title: 'Chính sách đổi - trả - hoàn tiền', eyebrow: 'HỖ TRỢ MUA HÀNG',
+    intro: 'Chính sách áp dụng cho sách giấy và sản phẩm liên quan được mua qua BookHub.',
+    sections: [
+      ['Trường hợp được yêu cầu', 'Sách bị lỗi in hoặc hư hỏng, giao sai sản phẩm, thiếu sản phẩm, sản phẩm không đúng mô tả hoặc hư hỏng do vận chuyển. Khách nên chụp ảnh kiện hàng và sản phẩm ngay khi nhận.'],
+      ['Thời hạn', 'Yêu cầu nên được gửi trong 7 ngày từ khi đơn chuyển sang Đã giao thành công. Với lỗi ẩn phát hiện sau đó, BookHub tiếp nhận để đánh giá theo từng trường hợp.'],
+      ['Quy trình', 'Mở Đơn hàng của tôi, chọn đơn đã giao, chọn Yêu cầu trả hàng, nêu lý do và gửi hình ảnh chứng minh. Người bán kiểm tra yêu cầu; BookHub có thể yêu cầu bổ sung thông tin hoặc điều phối nhận hàng.'],
+      ['Kiểm tra và phương thức hoàn tiền', 'Sau khi nhận và kiểm tra sản phẩm, đơn vị xử lý sẽ xác nhận đổi sách, gửi bù hoặc hoàn tiền. Hoàn tiền về phương thức ban đầu hoặc theo thỏa thuận hợp lệ; thời gian phụ thuộc ngân hàng/ví.'],
+      ['Trường hợp không được hoàn tiền', 'Không áp dụng cho sách đã qua sử dụng, rách/mất trang do người mua, thiếu phụ kiện do người mua làm mất, đổi ý ngoài thời hạn hoặc dấu hiệu lợi dụng chính sách.']
+    ]
+  },
+  '/support/warranty': {
+    title: 'Chính sách bảo hành - bồi hoàn', eyebrow: 'HỖ TRỢ SẢN PHẨM',
+    intro: 'Sách thường không có bảo hành kỹ thuật như thiết bị, nhưng BookHub bảo vệ khách hàng trước lỗi sản phẩm và thiệt hại do giao nhận.',
+    sections: [
+      ['Sách lỗi và thay thế', 'Lỗi in nghiêm trọng, bong gáy, thiếu trang, in nhòe hoặc sai ấn bản được xem xét đổi sách hoặc hoàn tiền theo tồn kho.'],
+      ['Bồi hoàn do giao nhận', 'Nếu kiện hàng bị móp, ướt, rách hoặc sản phẩm hư hỏng khi vận chuyển, khách cần giữ nguyên bao bì, chụp ảnh và gửi yêu cầu để BookHub phối hợp người bán/đơn vị giao hàng.'],
+      ['Cách xử lý', 'BookHub xác minh ảnh, video, mã đơn và thông tin giao nhận. Kết quả có thể là đổi sản phẩm, gửi bù, mã giảm giá hỗ trợ hoặc hoàn tiền tùy mức độ và khả năng cung ứng.']
+    ]
+  },
+  '/support/shipping': {
+    title: 'Chính sách vận chuyển', eyebrow: 'GIAO NHẬN SÁCH',
+    intro: 'BookHub hỗ trợ giao hàng theo khu vực và phương thức hiển thị tại bước thanh toán.',
+    sections: [
+      ['Phạm vi và thời gian', 'Đơn được giao tới các khu vực mà đối tác vận chuyển hỗ trợ. Người bán cần đóng gói và xác nhận đơn trước khi bàn giao. Thời gian dự kiến hiển thị theo phương thức Standard, Express hoặc Same-day.'],
+      ['Phí vận chuyển', 'Mức phí được tính tại checkout theo phương thức và điều kiện đơn hàng. Một số chương trình freeship có thể thay đổi theo thời gian.'],
+      ['Theo dõi và giao thất bại', 'Khách theo dõi lộ trình trong Đơn hàng của tôi. Khi giao thất bại, đối tác có thể liên hệ giao lại; khách nên giữ điện thoại và cập nhật địa chỉ chính xác.'],
+      ['Đổi địa chỉ và giao chậm', 'Địa chỉ chỉ nên đổi trước khi đơn bàn giao. Nếu đơn chậm hơn dự kiến, hãy dùng mã đơn để liên hệ hỗ trợ; BookHub sẽ kiểm tra với người bán và đơn vị vận chuyển.'],
+      ['Hư hỏng trong vận chuyển', 'Giữ kiện hàng, chụp ảnh và gửi yêu cầu đổi trả trong thời hạn chính sách để được hỗ trợ.']
+    ]
+  },
+  '/support/wholesale': {
+    title: 'Chính sách khách sỉ', eyebrow: 'DÀNH CHO ĐƠN VỊ MUA SỈ',
+    intro: 'BookHub hỗ trợ trường học, doanh nghiệp, thư viện và nhà sách cần mua số lượng lớn.',
+    sections: [
+      ['Đối tượng và điều kiện', 'Khách sỉ là tổ chức hoặc cá nhân có nhu cầu mua nhiều đầu sách cho hoạt động giáo dục, kinh doanh, thư viện hoặc chương trình tặng sách. Điều kiện số lượng và mức giá được xác nhận theo từng nhà bán.'],
+      ['Đặt hàng và giá', 'Gửi danh sách ISBN/tên sách, số lượng, địa chỉ và thời gian cần hàng qua Liên hệ hỗ trợ. BookHub sẽ kiểm tra tồn kho, báo giá, chiết khấu và thời gian cung ứng thực tế.'],
+      ['Thanh toán và vận chuyển', 'Phương thức thanh toán, hóa đơn, đóng gói và giao nhiều điểm được thỏa thuận trước khi xác nhận đơn. Các đơn sỉ có thể cần đặt cọc hoặc thời gian chuẩn bị riêng.']
+    ]
+  }
+};
+
+function escapeContentHtml(value) {
+  return String(value || '').replace(/[&<>'"]/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[char]));
+}
+
+function initFooterNavigation() {
+  document.querySelectorAll('.site-footer a[href^="/"]').forEach(link => {
+    link.addEventListener('click', event => {
+      event.preventDefault();
+      navigateContentPage(link.getAttribute('href'));
+    });
+  });
+  document.querySelectorAll('.footer-group-toggle').forEach(button => {
+    button.addEventListener('click', () => {
+      const group = button.closest('.footer-link-group');
+      const expanded = button.getAttribute('aria-expanded') === 'true';
+      button.setAttribute('aria-expanded', String(!expanded));
+      group?.classList.toggle('is-collapsed', expanded);
+    });
+  });
+  document.getElementById('footer-logout-link')?.addEventListener('click', () => handleLogout());
+}
+
+function navigateContentPage(path) {
+  if (path === '/') {
+    history.pushState({}, '', '/');
+    showPublicMarketplace();
+    return;
+  }
+  if (path === '/login' || path === '/register') {
+    history.pushState({}, '', path);
+    showAuthPage();
+    switchAuthTab(path === '/register' ? 'register' : 'login');
+    return;
+  }
+  history.pushState({}, '', path);
+  renderContentRoute();
+}
+
+async function handleContentRoute() {
+  const path = window.location.pathname === '/terms' ? '/support/terms' : window.location.pathname === '/privacy' ? '/support/privacy' : window.location.pathname;
+  if (path !== window.location.pathname) history.replaceState({}, '', path);
+  if (path === '/login' || path === '/register') {
+    showAuthPage();
+    switchAuthTab(path === '/register' ? 'register' : 'login');
+    return true;
+  }
+  const isContentRoute = Boolean(supportPageContent[path] || ['/bookstores', '/account', '/account/addresses', '/account/history', '/account/orders', '/support/faq', '/support/contact'].includes(path));
+  if (!isContentRoute) return false;
+  await renderContentRoute();
+  return true;
+}
+
+async function renderContentRoute() {
+  const path = window.location.pathname;
+  const root = document.getElementById('content-page-root');
+  if (!root) return;
+  if (['/account', '/account/addresses', '/account/history', '/account/orders'].includes(path) && !state.currentUser) {
+    showAuthPage();
+    switchAuthTab('login');
+    return;
+  }
+  document.getElementById('auth-page').style.display = 'none';
+  document.getElementById('main-app-wrapper').style.display = 'block';
+  document.querySelectorAll('.portal-container').forEach(portal => { portal.style.display = 'none'; });
+  ['single-checkout-root', 'order-success-root', 'book-detail-root'].forEach(id => { const node = document.getElementById(id); if (node) node.style.display = 'none'; });
+  root.style.display = 'block';
+  switchPortalChrome(false);
+  const contentTitles = {
+    '/bookstores': 'Hệ thống nhà sách',
+    '/support/faq': 'Câu hỏi thường gặp',
+    '/support/contact': 'Liên hệ hỗ trợ',
+    '/account': 'Thông tin tài khoản',
+    '/account/addresses': 'Địa chỉ giao hàng',
+    '/account/orders': 'Đơn hàng của tôi',
+    '/account/history': 'Lịch sử mua hàng'
+  };
+  document.title = `${supportPageContent[path]?.title || contentTitles[path] || 'BookHub'} | BookHub`;
+  const meta = document.querySelector('meta[name="description"]') || document.head.appendChild(Object.assign(document.createElement('meta'), { name: 'description' }));
+  meta.content = supportPageContent[path]?.intro || 'Thông tin hỗ trợ và dịch vụ dành cho khách hàng BookHub.';
+
+  if (supportPageContent[path]) renderSupportPage(root, supportPageContent[path]);
+  else if (path === '/support/faq') renderFaqPage(root);
+  else if (path === '/support/contact') renderContactPage(root);
+  else if (path === '/bookstores') await renderBookstoresPage(root);
+  else await renderAccountPage(root, path);
+  resetPageScroll();
+}
+
+function switchPortalChrome(isAdmin) {
+  ['.demo-role-bar', '.main-header', '.storefront-nav', '#catalog-mega-menu', '.site-footer'].forEach(selector => document.querySelector(selector)?.classList.toggle('admin-chrome-hidden', isAdmin));
+}
+
+function contentPageFrame(eyebrow, title, intro, body) {
+  return `<div class="content-page-shell"><div class="content-page-hero"><span class="checkout-eyebrow">${eyebrow}</span><h1>${title}</h1><p>${intro}</p></div><div class="content-page-body">${body}</div></div>`;
+}
+
+function renderSupportPage(root, page) {
+  root.innerHTML = contentPageFrame(page.eyebrow, page.title, page.intro, page.sections.map(([title, text]) => `<section class="content-section"><h2>${title}</h2><p>${text}</p></section>`).join(''));
+}
+
+function renderFaqPage(root) {
+  const groups = {
+    'Tài khoản': ['Làm sao để đăng ký?', 'Bạn chọn Đăng ký ở header hoặc footer, nhập thông tin hợp lệ và xác nhận biểu mẫu.'],
+    'Tìm kiếm và sản phẩm': ['Tôi có thể tìm theo tác giả không?', 'Có. Search hỗ trợ tên sách, tác giả, thể loại và nhà xuất bản.'],
+    'Đặt hàng và thanh toán': ['Tôi theo dõi đơn ở đâu?', 'Mở Đơn hàng của tôi trong footer hoặc header để xem trạng thái và lộ trình.'],
+    'Vận chuyển': ['Phí giao hàng được tính thế nào?', 'Phí được hiển thị tại checkout theo phương thức vận chuyển và điều kiện đơn hàng.'],
+    'Đổi trả và hoàn tiền': ['Sách lỗi có được đổi không?', 'Có. Hãy gửi yêu cầu trong thời hạn chính sách, kèm ảnh sản phẩm và kiện hàng.'],
+    'Đánh giá': ['Khi nào tôi được đánh giá sách?', 'Sau khi đơn chuyển sang Đã giao thành công, bạn có thể đánh giá sản phẩm trong lịch sử đơn.'],
+    'Người bán': ['Nhà sách mở gian hàng thế nào?', 'Chọn Tạo tài khoản, đăng ký vai trò doanh nghiệp và gửi hồ sơ xác thực.']
+  };
+  const body = Object.entries(groups).map(([group, [question, answer]]) => `<section class="faq-group"><h2>${group}</h2><details><summary>${question}</summary><p>${answer}</p></details></section>`).join('');
+  root.innerHTML = contentPageFrame('BOOKHUB · HỎI ĐÁP', 'Câu hỏi thường gặp', 'Giải đáp nhanh các câu hỏi về sách, tài khoản, đơn hàng và hỗ trợ.', body);
+}
+
+function renderContactPage(root) {
+  root.innerHTML = contentPageFrame('BOOKHUB · HỖ TRỢ', 'Liên hệ hỗ trợ', 'Gửi yêu cầu, BookHub sẽ tiếp nhận và phản hồi theo thông tin bạn cung cấp.', `<div class="contact-layout"><form class="content-form" onsubmit="submitSupportMessage(event)"><label>Họ và tên<input name="name" required></label><label>Email<input name="email" type="email" required></label><label>Chủ đề<select name="topic"><option>Đơn hàng và vận chuyển</option><option>Thanh toán</option><option>Đổi trả - hoàn tiền</option><option>Tài khoản</option><option>Người bán</option></select></label><label>Nội dung<textarea name="message" rows="6" required></textarea></label><button class="btn-primary" type="submit">Gửi yêu cầu hỗ trợ</button></form><aside class="contact-card"><strong>BookHub Support</strong><p>Hotline: 1900 1234</p><p>Email: support@bookhub.vn</p><p>Thời gian: 08:00 - 18:00, Thứ 2 - Thứ 7</p></aside></div>`);
+}
+
+function submitSupportMessage(event) {
+  event.preventDefault();
+  const form = event.currentTarget;
+  localStorage.setItem('bookhub_last_support_request', new Date().toISOString());
+  form.reset();
+  showToast('Đã tiếp nhận yêu cầu. Bộ phận hỗ trợ sẽ phản hồi qua email.', 'success');
+}
+
+async function renderBookstoresPage(root) {
+  try {
+    const sellers = await apiCall('/api/books/sellers');
+    const cards = sellers.length ? sellers.map(seller => `<article class="seller-directory-card"><img src="${escapeContentHtml(seller.logo || 'https://api.dicebear.com/7.x/initials/svg?seed=' + encodeURIComponent(seller.shop_name))}" alt=""><div><span class="seller-directory-badge">✓ Đã tham gia BookHub</span><h2>${escapeContentHtml(seller.shop_name)}</h2><p>${escapeContentHtml(seller.description || 'Nhà sách và nhà xuất bản chính hãng trên BookHub.')}</p><strong>${seller.book_count} đầu sách</strong><button class="btn-preview" onclick="navigateHome(); document.getElementById('books-grid')?.scrollIntoView({behavior:'smooth'})">Xem sản phẩm</button></div></article>`).join('') : '<div class="content-empty">Chưa có nhà sách công khai.</div>';
+    root.innerHTML = contentPageFrame('BOOKHUB · ĐỐI TÁC', 'Hệ thống nhà sách', 'Khám phá các nhà xuất bản và nhà sách đang cung cấp sách trên BookHub.', `<div class="seller-directory-grid">${cards}</div>`);
+  } catch (error) { root.innerHTML = contentPageFrame('BOOKHUB · ĐỐI TÁC', 'Hệ thống nhà sách', 'Không thể tải danh sách nhà sách lúc này.', '<div class="content-empty">Vui lòng thử lại sau.</div>'); }
+}
+
+async function renderAccountPage(root, path) {
+  if (path === '/account/orders' || path === '/account/history') {
+    const orders = await apiCall('/api/orders/my-orders');
+    const cards = orders.length ? orders.map(order => `<article class="account-order-card"><div><span class="checkout-eyebrow">${escapeContentHtml(order.order_code)}</span><h2>${formatVND(order.total_amount)}</h2><p>${new Date(order.created_at).toLocaleDateString('vi-VN')} · ${escapeContentHtml(order.status)}</p></div><button class="btn-preview" onclick="openOrderTrackerModal(${order.id})">Xem chi tiết</button></article>`).join('') : '<div class="content-empty">Bạn chưa có đơn hàng nào.</div>';
+    root.innerHTML = contentPageFrame('TÀI KHOẢN · ĐƠN HÀNG', 'Lịch sử mua hàng', 'Theo dõi các đơn sách, trạng thái thanh toán và vận chuyển của bạn.', `<div class="account-order-list">${cards}</div>`);
+    return;
+  }
+  if (path === '/account/addresses') { await renderAccountAddresses(root); return; }
+  const user = await apiCall('/api/auth/me');
+  root.innerHTML = contentPageFrame('TÀI KHOẢN CỦA TÔI', 'Thông tin tài khoản', 'Quản lý thông tin liên hệ và trải nghiệm mua sách của bạn.', `<form class="content-form account-profile-form" onsubmit="saveAccountProfile(event)"><label>Tên hiển thị<input name="full_name" value="${escapeContentHtml(user.full_name)}" required></label><label>Email<input value="${escapeContentHtml(user.email)}" disabled></label><label>Số điện thoại<input name="phone" value="${escapeContentHtml(user.phone)}"></label><label>Địa chỉ mặc định<input name="address" value="${escapeContentHtml(user.address)}"></label><button class="btn-primary" type="submit">Lưu thông tin</button></form><div class="account-shortcuts"><a href="/account/addresses">Quản lý địa chỉ giao hàng</a><a href="/account/orders">Xem đơn hàng của tôi</a></div>`);
+}
+
+async function saveAccountProfile(event) {
+  event.preventDefault();
+  const form = new FormData(event.currentTarget);
+  const user = await apiCall('/api/auth/me', { method: 'PATCH', body: JSON.stringify(Object.fromEntries(form.entries())) });
+  state.currentUser = user;
+  localStorage.setItem('bookhub_user', JSON.stringify(user));
+  renderUserProfileWidget();
+  showToast('Đã cập nhật thông tin tài khoản.', 'success');
+}
+
+async function renderAccountAddresses(root) {
+  const addresses = await apiCall('/api/orders/addresses');
+  const locationsResponse = await apiCall('/api/orders/locations');
+  window.accountLocations = locationsResponse.locations || locationsResponse;
+  const cards = addresses.length ? addresses.map(address => `<article class="address-card"><div><strong>${escapeContentHtml(address.recipient_name)}</strong><p>${escapeContentHtml(address.phone)}</p><p>${escapeContentHtml([address.street, address.ward, address.district, address.province].filter(Boolean).join(', '))}</p></div><span class="address-default">${address.is_default ? 'Mặc định' : ''}</span><button class="footer-action-link" onclick="deleteAccountAddress(${address.id})">Xóa</button></article>`).join('') : '<div class="content-empty">Chưa có địa chỉ giao hàng.</div>';
+  const provinceOptions = window.accountLocations.map(location => `<option value="${escapeContentHtml(location.code)}">${escapeContentHtml(location.name)}</option>`).join('');
+  root.innerHTML = contentPageFrame('TÀI KHOẢN · GIAO NHẬN', 'Địa chỉ giao hàng', 'Lưu và quản lý địa chỉ để checkout nhanh hơn.', `<div class="address-list">${cards}</div><form class="content-form address-form" onsubmit="addAccountAddress(event)"><h2>Thêm địa chỉ mới</h2><label>Người nhận<input name="recipient_name" required value="${escapeContentHtml(state.currentUser?.full_name)}"></label><label>Số điện thoại<input name="phone" required value="${escapeContentHtml(state.currentUser?.phone)}"></label><div class="address-form-grid"><label>Tỉnh/Thành phố<select name="province_code" onchange="populateAccountDistricts(this.value)" required><option value="">Chọn tỉnh/thành</option>${provinceOptions}</select></label><label>Quận/Huyện<select name="district_code" onchange="populateAccountWards(this.value)" required disabled><option value="">Chọn quận/huyện</option></select></label><label>Phường/Xã<select name="ward_code" required disabled><option value="">Chọn phường/xã</option></select></label></div><label>Số nhà, tên đường<input name="street" required></label><label class="content-checkbox"><input name="is_default" type="checkbox" value="true"> Đặt làm địa chỉ mặc định</label><button class="btn-primary" type="submit">Lưu địa chỉ</button></form>`);
+}
+
+function populateAccountDistricts(provinceCode) {
+  const province = (window.accountLocations || []).find(item => String(item.code) === String(provinceCode));
+  const form = document.querySelector('.address-form');
+  const district = form?.elements.district_code;
+  const ward = form?.elements.ward_code;
+  if (!district || !ward) return;
+  district.innerHTML = '<option value="">Chọn quận/huyện</option>' + (province?.districts || []).map(item => `<option value="${escapeContentHtml(item.code)}">${escapeContentHtml(item.name)}</option>`).join('');
+  district.disabled = !province;
+  ward.innerHTML = '<option value="">Chọn phường/xã</option>';
+  ward.disabled = true;
+}
+
+function populateAccountWards(districtCode) {
+  const district = (window.accountLocations || []).flatMap(item => item.districts || []).find(item => String(item.code) === String(districtCode));
+  const ward = document.querySelector('.address-form')?.elements.ward_code;
+  if (!ward) return;
+  ward.innerHTML = '<option value="">Chọn phường/xã</option>' + (district?.wards || []).map(item => `<option value="${escapeContentHtml(item.code)}">${escapeContentHtml(item.name)}</option>`).join('');
+  ward.disabled = !district;
+}
+
+async function addAccountAddress(event) {
+  event.preventDefault();
+  const values = Object.fromEntries(new FormData(event.currentTarget).entries());
+  const province = (window.accountLocations || []).find(item => String(item.code) === String(values.province_code));
+  const district = (province?.districts || []).find(item => String(item.code) === String(values.district_code));
+  const ward = (district?.wards || []).find(item => String(item.code) === String(values.ward_code));
+  await apiCall('/api/orders/addresses', { method: 'POST', body: JSON.stringify({
+    recipient_name: values.recipient_name, phone: values.phone, province: province?.name, province_code: values.province_code,
+    district: district?.name, district_code: values.district_code, ward: ward?.name, ward_code: values.ward_code,
+    street: values.street, is_default: values.is_default === 'true'
+  }) });
+  showToast('Đã lưu địa chỉ giao hàng.', 'success');
+  renderContentRoute();
+}
+
+async function deleteAccountAddress(addressId) {
+  if (!confirm('Xóa địa chỉ này?')) return;
+  await apiCall(`/api/orders/addresses/${addressId}`, { method: 'DELETE' });
+  renderContentRoute();
 }
 
 function showRegisterFormAgain() {
@@ -3882,9 +4185,11 @@ function showPublicMarketplace() {
   const checkoutRoot = document.getElementById('single-checkout-root');
   const successRoot = document.getElementById('order-success-root');
   const detailRoot = document.getElementById('book-detail-root');
+  const contentRoot = document.getElementById('content-page-root');
   if (checkoutRoot) checkoutRoot.style.display = 'none';
   if (successRoot) successRoot.style.display = 'none';
   if (detailRoot) detailRoot.style.display = 'none';
+  if (contentRoot) contentRoot.style.display = 'none';
   resetPageScroll();
   renderUserProfileWidget();
   loadCategories();

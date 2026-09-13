@@ -5319,3 +5319,89 @@ body { background: #f3f4f6; }
   .toast { justify-content: center; padding: 11px 14px; font-size: 12px; }
 }
 
+/* Support, policy and account pages */
+.site-footer a,
+.footer-action-link {
+  color: #cbd5e1;
+  text-decoration: none;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+
+.site-footer a:hover,
+.footer-action-link:hover { color: #ffffff; text-decoration: underline; }
+.footer-group-toggle { border: 0; background: transparent; color: white; padding: 0; font: inherit; font-weight: 800; text-align: left; }
+.footer-group-toggle span { display: none; }
+.content-page-root { min-height: 60vh; }
+.content-page-shell { max-width: 1080px; margin: 0 auto; padding: 28px 20px 56px; }
+.content-page-hero { padding: 28px 32px; border-radius: 18px; color: white; background: linear-gradient(120deg, #123b8f, #2563eb 55%, #0f4c81); box-shadow: 0 12px 28px rgba(15, 23, 42, .14); }
+.content-page-hero h1 { margin: 8px 0 10px; font-size: 32px; line-height: 1.2; }
+.content-page-hero p { max-width: 760px; margin: 0; color: rgba(255,255,255,.88); font-size: 14px; }
+.content-page-body { display: grid; gap: 14px; margin-top: 18px; }
+.content-section, .faq-group, .contact-card, .content-form, .account-order-card, .address-card { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 14px; box-shadow: var(--shadow-sm); }
+.content-section { padding: 20px 22px; }
+.content-section h2, .faq-group h2 { margin-bottom: 8px; font-size: 17px; color: var(--text-main); }
+.content-section p, .faq-group p, .contact-card p, .content-note { color: var(--text-muted); font-size: 14px; line-height: 1.75; }
+.faq-group { padding: 18px 20px; }
+.faq-group details { border-top: 1px solid var(--border-color); padding-top: 12px; }
+.faq-group summary { cursor: pointer; font-weight: 700; color: var(--text-main); }
+.faq-group p { margin: 10px 0 0; }
+.contact-layout { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(240px, .6fr); gap: 16px; }
+.content-form { display: grid; gap: 14px; padding: 22px; }
+.content-form label { display: grid; gap: 6px; color: var(--text-main); font-size: 13px; font-weight: 700; }
+.content-form input, .content-form select, .content-form textarea { width: 100%; padding: 11px 12px; border: 1px solid var(--border-color); border-radius: 9px; background: var(--bg-card); color: var(--text-main); font: inherit; }
+.content-form button { min-height: 44px; justify-content: center; }
+.contact-card { align-self: start; padding: 22px; color: var(--text-main); }
+.seller-directory-grid, .account-order-list, .address-list { display: grid; gap: 12px; }
+.seller-directory-card { display: grid; grid-template-columns: 82px minmax(0, 1fr); gap: 16px; align-items: start; padding: 18px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 14px; }
+.seller-directory-card img { width: 82px; height: 82px; object-fit: cover; border-radius: 14px; background: var(--primary-light); }
+.seller-directory-card h2 { margin: 5px 0 6px; font-size: 18px; }
+.seller-directory-card p { color: var(--text-muted); margin-bottom: 8px; }
+.seller-directory-card strong { display: block; margin-bottom: 10px; color: var(--primary); }
+.seller-directory-badge, .address-default { color: var(--success); font-size: 11px; font-weight: 800; }
+.seller-directory-card .btn-preview { width: fit-content; min-height: 36px; }
+.account-order-card, .address-card { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 18px; }
+.account-order-card h2 { margin: 6px 0; color: var(--danger); font-size: 20px; }
+.account-order-card p, .address-card p { margin: 3px 0; color: var(--text-muted); font-size: 13px; }
+.account-order-card .btn-preview { min-height: 38px; white-space: nowrap; }
+.address-card { align-items: flex-start; }
+.address-card .footer-action-link { color: var(--danger); font-size: 12px; }
+.account-shortcuts { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 16px; }
+.account-shortcuts a { color: var(--primary); font-weight: 700; }
+.address-form { margin-top: 16px; }
+.address-form h2 { margin-bottom: 2px; font-size: 18px; }
+.address-form-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.content-checkbox { display: flex !important; grid-template-columns: none !important; align-items: center; gap: 8px !important; }
+.content-checkbox input { width: auto; }
+.content-inline-button { display: inline-flex; width: fit-content; text-decoration: none; }
+.content-empty { padding: 36px 20px; text-align: center; color: var(--text-muted); background: var(--bg-card); border: 1px dashed var(--border-color); border-radius: 14px; }
+
+@media (max-width: 767px) {
+  .footer-link-group { border-top: 1px solid rgba(255,255,255,.12); padding: 12px 0; }
+  .footer-link-group:first-of-type { border-top: 0; }
+  .footer-group-toggle { display: flex; width: 100%; justify-content: space-between; align-items: center; min-height: 34px; }
+  .footer-group-toggle span { display: inline-block; font-size: 18px; transition: transform .2s ease; }
+  .footer-link-group.is-collapsed .footer-group-toggle span { transform: rotate(-90deg); }
+  .footer-link-group.is-collapsed ul { display: none; }
+  .site-footer ul { margin-top: 8px; }
+  .site-footer li { padding: 4px 0; font-size: 12px; }
+  .content-page-shell { padding: 16px 10px 36px; }
+  .content-page-hero { padding: 20px 16px; border-radius: 14px; }
+  .content-page-hero h1 { font-size: 24px; }
+  .content-page-hero p, .content-section p, .faq-group p { font-size: 13px; }
+  .content-section, .faq-group { padding: 16px 14px; }
+  .contact-layout { grid-template-columns: 1fr; }
+  .content-form { padding: 16px; }
+  .address-form-grid { grid-template-columns: 1fr; gap: 10px; }
+  .seller-directory-card { grid-template-columns: 58px minmax(0, 1fr); gap: 10px; padding: 13px; }
+  .seller-directory-card img { width: 58px; height: 58px; border-radius: 10px; }
+  .seller-directory-card h2 { font-size: 15px; }
+  .seller-directory-card p { font-size: 12px; }
+  .account-order-card, .address-card { align-items: flex-start; flex-direction: column; gap: 10px; }
+  .account-order-card .btn-preview, .address-card .footer-action-link { width: 100%; text-align: center; }
+}
+
