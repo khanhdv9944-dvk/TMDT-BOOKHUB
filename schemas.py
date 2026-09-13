@@ -364,6 +364,7 @@ class OrderItemOut(BaseModel):
     book_cover: Optional[str]
     quantity: int
     price: float
+    author: Optional[str] = None
     seller_shop_name: Optional[str] = None
     publisher: Optional[str] = None
 
@@ -494,7 +495,6 @@ class ReviewOut(BaseModel):
     rating: int
     content: str
     status: str
-    created_at: datetime
     updated_at: Optional[datetime] = None
     buyer_name: Optional[str] = None
     buyer_avatar: Optional[str] = None

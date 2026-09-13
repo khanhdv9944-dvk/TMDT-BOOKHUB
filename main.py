@@ -13,7 +13,7 @@ from routes.admin_routes import router as admin_router
 from routes.vip_routes import router as vip_router
 from routes.notification_routes import router as notification_router
 from routes.reviews_routes import router as reviews_router
-from routes.returns_routes import router as returns_router
+from routes.returns_routes import buyer_router, seller_router as seller_return_router, admin_router as admin_return_router
 from seed_data import seed_database
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -48,7 +48,9 @@ app.include_router(admin_router)
 app.include_router(vip_router)
 app.include_router(notification_router)
 app.include_router(reviews_router)
-app.include_router(returns_router)
+app.include_router(buyer_router)
+app.include_router(seller_return_router)
+app.include_router(admin_return_router)
 
 # Mount static assets explicitly so Vercel serves the same URLs as local FastAPI.
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")

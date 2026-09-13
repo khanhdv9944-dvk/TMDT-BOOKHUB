@@ -531,9 +531,10 @@
       <button id="theme-toggle" class="icon-action-btn" onclick="toggleDarkMode()" title="Đổi chế độ sáng/tối">🌙</button>
 
       <!-- Widget User -->
-      <div id="user-profile-widget" class="user-profile-widget" onclick="if (state.currentUser) switchPortal(state.currentUser && state.currentUser.role); else showAuthPage();">
+      <div id="user-profile-widget" class="user-profile-widget" role="button" tabindex="0" aria-haspopup="menu" aria-expanded="false" onclick="toggleAccountMenu(event)" onkeydown="if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); toggleAccountMenu(event); }">
         <!-- Render bằng JS -->
       </div>
+      <button class="role-btn buyer-orders-btn" onclick="navigateContentPage('/account/history')" title="Lịch sử mua hàng">📦 Đơn hàng</button>
 
       <div id="guest-auth-inline" class="guest-auth-inline" style="display:none;">
         <button class="guest-login-btn" onclick="showAuthPage(); switchAuthTab('login')">Đăng nhập</button>

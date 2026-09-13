@@ -11,7 +11,6 @@ router = APIRouter(prefix="/api/books", tags=["Books"])
 def get_categories(db: Session = Depends(get_db)):
     return db.query(models.Category).all()
 
-
 @router.get("/sellers")
 def list_public_sellers(db: Session = Depends(get_db)):
     sellers = db.query(models.User).filter(

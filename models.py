@@ -280,6 +280,10 @@ class OrderItem(Base):
         return "NXB Chính hãng"
 
     @property
+    def author(self):
+        return self.book.author if self.book else None
+
+    @property
     def publisher(self):
         if self.book and self.book.publisher:
             return self.book.publisher

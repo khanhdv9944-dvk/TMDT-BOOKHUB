@@ -9,6 +9,9 @@ let state = {
   activeCategory: null,
   searchQuery: '',
   activeTab: 'home',
+  orderStatusFilter: 'ALL',
+  myOrders: [],
+  orderHistoryTarget: 'my-orders-list',
   productReviews: {},
   productReviewSummary: {}
 };
@@ -131,6 +134,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     if (!clickedOnCatalogTrigger) {
       closeCatalogMenu();
+    }
+    if (!target.closest('#user-profile-widget')) {
+      closeAccountMenu();
     }
   });
 
@@ -528,6 +534,7 @@ function renderUserProfileWidget() {
         <span>Khách</span>
       </div>
     `;
+    widget.setAttribute('aria-expanded', 'false');
     if (guestActions) guestActions.style.display = 'flex';
     if (logoutBtn) logoutBtn.style.display = 'none';
     if (footerLogout) footerLogout.style.display = 'none';
@@ -542,11 +549,39 @@ function renderUserProfileWidget() {
       <div class="user-name-role">${state.currentUser.full_name || state.currentUser.username} ${isVipBadge}</div>
       <div class="user-role-label">${getRoleDisplayName(state.currentUser.role, state.currentUser.shop_name)}</div>
     </div>
+    <span class="account-menu-chevron" aria-hidden="true">⌄</span>
+    <div id="account-menu" class="account-menu" role="menu" onclick="event.stopPropagation()">
+      <button type="button" role="menuitem" onclick="navigateContentPage('/account'); closeAccountMenu();">👤 Tài khoản của tôi</button>
+      <button type="button" role="menuitem" onclick="navigateContentPage('/account/history'); closeAccountMenu();">📦 Lịch sử mua hàng</button>
+      <button type="button" role="menuitem" onclick="navigateContentPage('/account/addresses'); closeAccountMenu();">📍 Địa chỉ giao hàng</button>
+      <button type="button" role="menuitem" onclick="navigateContentPage('/account'); closeAccountMenu();">⚙️ Cài đặt tài khoản</button>
+      <button type="button" role="menuitem" class="account-menu-logout" onclick="closeAccountMenu(); handleLogout();">🚪 Đăng xuất</button>
+    </div>
   `;
+  widget.setAttribute('aria-expanded', 'false');
 
   if (guestActions) guestActions.style.display = 'none';
   if (logoutBtn) logoutBtn.style.display = 'inline-flex';
   if (footerLogout) footerLogout.style.display = 'inline-block';
+}
+
+function toggleAccountMenu(event) {
+  event?.stopPropagation();
+  if (!state.currentUser) {
+    showAuthPage();
+    return;
+  }
+  const widget = document.getElementById('user-profile-widget');
+  if (!widget) return;
+  const isOpen = widget.classList.toggle('account-menu-open');
+  widget.setAttribute('aria-expanded', String(isOpen));
+}
+
+function closeAccountMenu() {
+  const widget = document.getElementById('user-profile-widget');
+  if (!widget) return;
+  widget.classList.remove('account-menu-open');
+  widget.setAttribute('aria-expanded', 'false');
 }
 
 function getRoleDisplayName(role, shopName) {
@@ -1578,6 +1613,45 @@ async function openOrderTrackerModal(orderId) {
   } catch (e) {}
 }
 
+function getOrderStatusInfo(order) {
+  const status = order.status;
+  const returnStatus = order.return_status;
+  if (returnStatus === 'REFUNDED') return { label: 'Đã hoàn tiền', className: 'badge-danger' };
+  if (returnStatus === 'APPROVED' || status === 'RETURNED') return { label: 'Đã duyệt hoàn trả', className: 'badge-info' };
+  if (returnStatus === 'REQUESTED') return { label: 'Đang xử lý hoàn trả', className: 'badge-warning' };
+  const statuses = {
+    PENDING: ['Đang chờ xử lý', 'badge-warning'],
+    PACKING: ['Đang đóng gói', 'badge-info'],
+    SHIPPING: ['Đang vận chuyển', 'badge-info'],
+    DELIVERED: ['Đã giao thành công', 'badge-success'],
+    CANCELLED: ['Đã hủy', 'badge-danger']
+  };
+  const [label, className] = statuses[status] || ['Chưa xác định', 'badge-warning'];
+  return { label, className };
+}
+
+function renderOrderTimeline(order) {
+  const steps = [
+    { num: 1, label: 'Đặt hàng thành công' },
+    { num: 2, label: 'Người bán đang chuẩn bị hàng' },
+    { num: 3, label: 'Đã bàn giao cho đơn vị vận chuyển' },
+    { num: 4, label: 'Đang vận chuyển' },
+    { num: 5, label: 'Đang giao hàng' },
+    { num: 6, label: 'Giao hàng thành công' }
+  ];
+  const isException = order.status === 'CANCELLED' || ['REQUESTED', 'APPROVED', 'REFUNDED'].includes(order.return_status);
+  const trackingStepMap = { 1: 1, 2: 2, 3: 4, 4: 6 };
+  let activeStep = trackingStepMap[Number(order.tracking_step)] || (order.status === 'PENDING' ? 1 : order.status === 'PACKING' ? 2 : order.status === 'SHIPPING' ? 4 : order.status === 'DELIVERED' ? 6 : 1);
+  if (order.return_status === 'REFUNDED' || order.status === 'RETURNED') activeStep = 6;
+  const timelineSteps = isException
+    ? [{ num: 1, label: order.status === 'CANCELLED' ? 'Đơn hàng đã bị hủy' : 'Yêu cầu hoàn trả/hoàn tiền' }]
+    : steps;
+  return timelineSteps.map(step => {
+    const stateClass = isException ? 'active' : step.num < activeStep ? 'done' : step.num === activeStep ? 'active' : '';
+    return `<div class="tracking-step-item ${stateClass}"><div class="step-circle">${stateClass === 'done' ? '✓' : step.num}</div><div class="step-label">${step.label}</div></div>`;
+  }).join('');
+}
+
 async function openOrderDetailModal(orderId) {
   if (!state.currentUser) {
     requireLoginForAction('Xem chi tiết đơn hàng');
@@ -1586,41 +1660,17 @@ async function openOrderDetailModal(orderId) {
 
   try {
     const order = await apiCall(`/api/orders/${orderId}`);
+    const myReviews = await apiCall('/api/reviews/my');
+    const orderReviews = Array.isArray(myReviews) ? myReviews.filter(review => Number(review.order_id) === Number(order.id)) : [];
     const modal = document.getElementById('order-detail-modal');
     const headerCode = document.getElementById('order-detail-code-header');
     const content = document.getElementById('order-detail-content');
 
     if (headerCode) headerCode.textContent = `#${order.order_code}`;
 
-    let statusBadge = '<span class="badge badge-warning">Chờ đóng gói</span>';
-    if (order.status === 'PENDING') statusBadge = '<span class="badge badge-warning">Đang chờ xử lý</span>';
-    if (order.status === 'PACKING') statusBadge = '<span class="badge badge-info">Đang đóng gói</span>';
-    if (order.status === 'SHIPPING') statusBadge = '<span class="badge badge-info">Đang vận chuyển</span>';
-    if (order.status === 'DELIVERED') statusBadge = '<span class="badge badge-success">Đã giao thành công</span>';
-    if (order.status === 'CANCELLED') statusBadge = '<span class="badge badge-danger">Đã hủy</span>';
-
-    // Shipping progress steps
-    const step = order.tracking_step || 1;
-    const steps = [
-      { num: 1, label: 'Đã Đặt Hàng' },
-      { num: 2, label: 'Đóng Gói' },
-      { num: 3, label: 'Đang Giao' },
-      { num: 4, label: 'Hoàn Tất' }
-    ];
-
-    let stepsHtml = '';
-    steps.forEach(s => {
-      let stepClass = '';
-      if (s.num < step) stepClass = 'done';
-      else if (s.num === step) stepClass = 'active';
-
-      stepsHtml += `
-        <div class="tracking-step-item ${stepClass}">
-          <div class="step-circle">${s.num < step ? '✓' : s.num}</div>
-          <div class="step-label">${s.label}</div>
-        </div>
-      `;
-    });
+    const statusInfo = getOrderStatusInfo(order);
+    const statusBadge = `<span class="badge ${statusInfo.className}">${statusInfo.label}</span>`;
+    const stepsHtml = renderOrderTimeline(order);
 
     // Address text
     const fullAddress = [
@@ -1649,6 +1699,7 @@ async function openOrderDetailModal(orderId) {
     if (Array.isArray(order.items)) {
       order.items.forEach(it => {
         const shopName = it.seller_shop_name || it.publisher || 'NXB Chính hãng';
+        const itemReview = orderReviews.find(review => Number(review.order_item_id) === Number(it.id));
         const escapedShopName = shopName.replace(/'/g, "\\'");
         itemsHtml += `
           <div style="display:flex; justify-content:space-between; align-items:center; padding:12px 0; border-bottom:1px solid #f1f5f9;">
@@ -1656,7 +1707,9 @@ async function openOrderDetailModal(orderId) {
               <img src="${it.book_cover || 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?auto=format&fit=crop&q=80&w=100'}" style="width:50px; height:68px; object-fit:cover; border-radius:6px; box-shadow:0 1px 3px rgba(0,0,0,0.1); cursor:pointer;" onclick="closeModal('order-detail-modal'); openBookDetailModal(${it.book_id})">
               <div>
                 <div style="font-weight:700; font-size:14px; color:#1e293b; cursor:pointer;" onclick="closeModal('order-detail-modal'); openBookDetailModal(${it.book_id})">${it.book_title}</div>
+                <div style="font-size:12px; color:#64748b; margin-top:2px;">Tác giả: ${it.author || 'Đang cập nhật'}</div>
                 <div style="font-size:12px; color:#64748b; margin-top:2px;">Đơn giá: ${formatVND(it.price)} x ${it.quantity}</div>
+                ${itemReview ? '<div style="font-size:12px; color:#16a34a; font-weight:700; margin-top:5px;">✓ Đã đánh giá</div>' : ''}
                 <div style="margin-top:6px; display:flex; align-items:center; gap:8px;">
                   <span style="font-size:12px; color:#475569; font-weight:600;">🏢 ${shopName}</span>
                   <button class="btn-outline" style="padding:2px 8px; font-size:11px; color:#2563eb; border-color:#93c5fd; background:#eff6ff; border-radius:4px; font-weight:600; cursor:pointer;" onclick="openSellerShopModal(${it.seller_id}, '${escapedShopName}')">
@@ -1679,7 +1732,7 @@ async function openOrderDetailModal(orderId) {
 
     let reviewBtn = '';
     if (order.status === 'DELIVERED') {
-      reviewBtn = `<button class="btn-preview" style="padding:8px 16px; font-size:13px; font-weight:700;" onclick="closeModal('order-detail-modal'); openOrderReviewModal(${order.id})">⭐ Đánh giá sản phẩm</button>`;
+      reviewBtn = `<button class="btn-preview" style="padding:8px 16px; font-size:13px; font-weight:700;" onclick="closeModal('order-detail-modal'); openOrderReviewModal(${order.id})">⭐ Viết đánh giá</button>`;
     }
 
     let returnBtn = '';
@@ -1698,9 +1751,12 @@ async function openOrderDetailModal(orderId) {
           <div>${statusBadge}</div>
         </div>
 
-        <!-- Tracking steps -->
-        <div class="tracking-steps" style="margin:6px 0;">
+        <!-- Shipping timeline remains part of the order detail -->
+        <div class="order-detail-section tracking-section">
+          <h4 class="order-detail-section-title">🚚 Lộ trình vận chuyển</h4>
+          <div class="tracking-steps" style="margin:6px 0;">
           ${stepsHtml}
+          </div>
         </div>
 
         <!-- Order Items -->
@@ -1710,7 +1766,7 @@ async function openOrderDetailModal(orderId) {
         </div>
 
         <!-- Grid 2 columns: Delivery & Payment -->
-        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:14px;">
+        <div class="order-detail-info-grid" style="display:grid; grid-template-columns: 1fr 1fr; gap:14px;">
           <!-- Receiver info -->
           <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:16px;">
             <h4 style="margin:0 0 10px; font-size:14px; font-weight:700; color:#0f172a;">📍 Địa chỉ giao hàng</h4>
@@ -1738,7 +1794,7 @@ async function openOrderDetailModal(orderId) {
               </div>
               <div style="border-top:1px dashed #cbd5e1; padding-top:8px; margin-top:8px;">
                 <div style="display:flex; justify-content:space-between; font-size:12px; color:#64748b; margin-top:4px;">
-                  <span>Tạm tính:</span>
+                  <span>Tổng tiền hàng:</span>
                   <span>${formatVND(order.subtotal_amount || (order.total_amount - (order.shipping_fee || 0) + (order.discount_amount || 0)))}</span>
                 </div>
                 <div style="display:flex; justify-content:space-between; font-size:12px; color:#64748b; margin-top:2px;">
@@ -1762,9 +1818,6 @@ async function openOrderDetailModal(orderId) {
 
         <!-- Action Footer -->
         <div style="display:flex; justify-content:flex-end; gap:10px; align-items:center; border-top:1px solid #e2e8f0; padding-top:14px;">
-          <button class="btn-primary" style="padding:8px 16px; font-size:13px;" onclick="openOrderTrackerModal(${order.id})">
-            🚚 Lộ trình vận chuyển
-          </button>
           ${confirmReceivedBtn}
           ${reviewBtn}
           ${returnBtn}
@@ -1888,6 +1941,40 @@ async function openSellerShopModal(sellerId, shopName) {
   }
 }
 
+function renderMyOrdersList(targetId = state.orderHistoryTarget || 'my-orders-list') {
+  const container = document.getElementById(targetId);
+  if (!container) return;
+  const filter = state.orderStatusFilter || 'ALL';
+  const orders = state.myOrders.filter(order => {
+    if (filter === 'RETURNED') return order.status === 'RETURNED' || ['REQUESTED', 'APPROVED', 'REFUNDED'].includes(order.return_status);
+    return filter === 'ALL' || order.status === filter;
+  });
+  const filterOptions = [
+    ['ALL', 'Tất cả'], ['PENDING', 'Chờ xác nhận'], ['PACKING', 'Đang chuẩn bị hàng'],
+    ['SHIPPING', 'Đang vận chuyển'], ['DELIVERED', 'Đã giao'], ['CANCELLED', 'Đã hủy'], ['RETURNED', 'Đã hoàn trả/hoàn tiền']
+  ];
+  const filterHtml = `<div class="order-history-filters" role="tablist">${filterOptions.map(([value, label]) => `<button class="order-filter-button ${filter === value ? 'active' : ''}" type="button" onclick="state.orderStatusFilter='${value}'; renderMyOrdersList()">${label}</button>`).join('')}</div>`;
+  if (orders.length === 0) {
+    container.innerHTML = `${filterHtml}<div style="text-align:center; padding:30px; color:#94a3b8;">Không có đơn hàng ở trạng thái này</div>`;
+    return;
+  }
+  const orderHtml = orders.map(o => {
+    const statusInfo = getOrderStatusInfo(o);
+    const statusBadge = `<span class="badge ${statusInfo.className}">${statusInfo.label}</span>`;
+    return `
+      <div onclick="openOrderDetailModal(${o.id})" style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:16px; margin-bottom:12px; cursor:pointer; transition:all 0.2s;" onmouseover="this.style.borderColor='#3b82f6'; this.style.boxShadow='0 4px 6px -1px rgba(0,0,0,0.1)'" onmouseout="this.style.borderColor='#e2e8f0'; this.style.boxShadow='none'">
+        <div style="display:flex; justify-content:space-between; margin-bottom:8px; align-items:center; gap:8px; flex-wrap:wrap;">
+          <span style="font-weight:800; color:#1e293b;" onclick="event.stopPropagation(); openOrderDetailModal(${o.id})">Mã đơn: <u style="color:#2563eb; cursor:pointer;">${o.order_code}</u></span>
+          ${statusBadge}
+        </div>
+        <div style="font-size:13px; color:#64748b; margin-bottom:10px;">Tổng tiền: <b style="color:#ef4444;">${formatVND(o.total_amount)}</b> | Ngày đặt: ${new Date(o.created_at).toLocaleDateString('vi-VN')}</div>
+        <div style="font-size:12px; color:#475569; margin-bottom:10px;">${(o.items || []).map(item => `${item.book_title} (x${item.quantity})`).join(' · ')}</div>
+        <button class="btn-primary order-detail-trigger" onclick="event.stopPropagation(); openOrderDetailModal(${o.id})">📄 Xem chi tiết đơn hàng</button>
+      </div>`;
+  }).join('');
+  container.innerHTML = filterHtml + orderHtml;
+}
+
 async function openMyOrdersModal() {
   if (!state.currentUser) {
     requireLoginForAction('Xem lịch sử đơn hàng');
@@ -1895,65 +1982,11 @@ async function openMyOrdersModal() {
   }
 
   try {
-    const orders = await apiCall('/api/orders/my-orders');
+    state.myOrders = await apiCall('/api/orders/my-orders');
     const modal = document.getElementById('my-orders-modal');
-    const container = document.getElementById('my-orders-list');
-
-    if (orders.length === 0) {
-      container.innerHTML = `<div style="text-align:center; padding:30px; color:#94a3b8;">Bạn chưa có đơn hàng nào</div>`;
-    } else {
-      let html = '';
-      orders.forEach(o => {
-        let statusBadge = '<span class="badge badge-warning">Chờ đóng gói</span>';
-        if (o.status === 'PENDING') statusBadge = '<span class="badge badge-warning">Đang chờ xử lý</span>';
-        if (o.status === 'PACKING') statusBadge = '<span class="badge badge-info">Đang đóng gói</span>';
-        if (o.status === 'SHIPPING') statusBadge = '<span class="badge badge-info">Đang vận chuyển</span>';
-        if (o.status === 'DELIVERED') statusBadge = '<span class="badge badge-success">Đã giao thành công</span>';
-        if (o.status === 'CANCELLED') statusBadge = '<span class="badge badge-danger">Đã hủy</span>';
-
-        let cardActions = `
-          <button class="btn-primary" style="padding:6px 14px; font-size:12px;" onclick="event.stopPropagation(); openOrderDetailModal(${o.id})">
-            📄 Chi tiết đơn hàng
-          </button>
-        `;
-
-        if (o.status === 'SHIPPING') {
-          cardActions += `
-            <button class="btn-success" style="padding:6px 14px; font-size:12px; background:#10b981; color:#fff; border:none; border-radius:6px; font-weight:700; cursor:pointer;" onclick="event.stopPropagation(); handleConfirmOrderReceived(${o.id})">
-              ✅ Đã nhận được hàng
-            </button>
-          `;
-        }
-
-        if (o.status === 'DELIVERED') {
-          cardActions += `
-            <button class="btn-preview" style="padding:6px 14px; font-size:12px; font-weight:700;" onclick="event.stopPropagation(); openOrderReviewModal(${o.id})">
-              ⭐ Đánh giá sản phẩm
-            </button>
-            <button class="btn-secondary" style="padding:6px 14px; font-size:12px;" onclick="event.stopPropagation(); openReturnRequestModal(${o.id})">
-              ↩️ Yêu cầu trả hàng
-            </button>
-          `;
-        }
-
-        html += `
-          <div onclick="openOrderDetailModal(${o.id})" style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:16px; margin-bottom:12px; cursor:pointer; transition:all 0.2s;" onmouseover="this.style.borderColor='#3b82f6'; this.style.boxShadow='0 4px 6px -1px rgba(0,0,0,0.1)'" onmouseout="this.style.borderColor='#e2e8f0'; this.style.boxShadow='none'">
-            <div style="display:flex; justify-content:space-between; margin-bottom:8px; align-items:center;">
-              <span style="font-weight:800; color:#1e293b;" onclick="event.stopPropagation(); openOrderDetailModal(${o.id})">Mã đơn: <u style="color:#2563eb; cursor:pointer;">${o.order_code}</u></span>
-              ${statusBadge}
-            </div>
-            <div style="font-size:13px; color:#64748b; margin-bottom:10px;">
-              Tổng tiền: <b style="color:#ef4444;">${formatVND(o.total_amount)}</b> | Ngày đặt: ${new Date(o.created_at).toLocaleDateString('vi-VN')}
-            </div>
-            <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
-              ${cardActions}
-            </div>
-          </div>
-        `;
-      });
-      container.innerHTML = html;
-    }
-
+    state.orderHistoryTarget = 'my-orders-list';
+    state.orderStatusFilter = 'ALL';
+    renderMyOrdersList();
     modal.classList.add('open');
   } catch (e) {}
 }
@@ -1998,16 +2031,18 @@ async function handleWriteReviewForBook(bookId) {
   }
 }
 
-function openSingleBookReviewModal(order, item) {
+function openSingleBookReviewModal(order, item, existingReview = null) {
   const formRoot = document.getElementById('review-form-root');
   if (!formRoot) return;
+  const selectedRating = Number(existingReview?.rating || 5);
+  const existingContent = escapeHtml(existingReview?.content || '');
   formRoot.innerHTML = `
     <div style="display:flex; flex-direction:column; gap:16px;">
       <div>
         <h4 style="margin:0 0 6px; font-size:16px;">Đánh giá sách: ${item.book_title}</h4>
         <p style="margin:0; color:#64748b; font-size:13px;">Mã đơn hàng: <b>${order.order_code}</b> · Đã giao thành công</p>
       </div>
-      <div data-review-item="${item.id}" data-selected-rating="5" style="padding:16px; border:1px solid #e2e8f0; border-radius:10px; background:#f8fafc; display:flex; gap:14px; align-items:flex-start;">
+      <div data-review-item="${item.id}" data-selected-rating="${selectedRating}" style="padding:16px; border:1px solid #e2e8f0; border-radius:10px; background:#f8fafc; display:flex; gap:14px; align-items:flex-start;">
         <img src="${item.book_cover || 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?auto=format&fit=crop&q=80&w=80'}" style="width:64px; height:84px; object-fit:cover; border-radius:8px; box-shadow:0 2px 6px rgba(0,0,0,0.1);">
         <div style="flex:1; min-width:0;">
           <div style="font-weight:700; font-size:15px; margin-bottom:8px; color:#1e293b;">${item.book_title}</div>
@@ -2019,16 +2054,16 @@ function openSingleBookReviewModal(order, item) {
                        onclick="highlightInteractiveStars(${item.id}, ${star})"
                        onmouseover="previewInteractiveStars(${item.id}, ${star})"
                        onmouseout="resetInteractiveStars(${item.id})">
-                  <input type="radio" id="star-radio-${item.id}-${star}" name="rating-${item.id}" value="${star}" style="display:none;" ${star === 5 ? 'checked' : ''}>
+                  <input type="radio" id="star-radio-${item.id}-${star}" name="rating-${item.id}" value="${star}" style="display:none;" ${star === selectedRating ? 'checked' : ''}>
                   <span id="star-icon-${item.id}-${star}" style="color:#fbbf24; transition:color 0.15s;">★</span>
                 </label>
               `).join('')}
-              <span id="star-label-${item.id}" style="margin-left:8px; font-size:13px; font-weight:600; color:#b45309;">Tuyệt vời (5/5)</span>
+              <span id="star-label-${item.id}" style="margin-left:8px; font-size:13px; font-weight:600; color:#b45309;">${selectedRating}/5</span>
             </div>
           </div>
           <div style="margin-bottom:10px;">
             <label style="display:block; font-weight:600; font-size:13px; margin-bottom:4px; color:#475569;">Nhận xét chi tiết:</label>
-            <textarea rows="3" placeholder="Chia sẻ cảm nhận về chất lượng in ấn, nội dung sách, dịch vụ đóng gói..." style="width:100%; resize:vertical; border:1px solid #cbd5e1; border-radius:8px; padding:10px 12px; font-size:13px; font-family:inherit;" data-review-content="${item.id}"></textarea>
+            <textarea rows="3" placeholder="Chia sẻ cảm nhận về chất lượng in ấn, nội dung sách, dịch vụ đóng gói..." style="width:100%; resize:vertical; border:1px solid #cbd5e1; border-radius:8px; padding:10px 12px; font-size:13px; font-family:inherit;" data-review-content="${item.id}">${existingContent}</textarea>
           </div>
           <div style="margin-bottom:12px;">
             <label style="display:block; font-weight:600; font-size:13px; margin-bottom:4px; color:#475569;">Ảnh minh họa (tùy chọn):</label>
@@ -2036,7 +2071,7 @@ function openSingleBookReviewModal(order, item) {
           </div>
           <div style="display:flex; justify-content:flex-end; gap:8px;">
             <button class="btn-secondary" style="padding:8px 16px; font-size:13px;" onclick="closeModal('review-modal')">Hủy</button>
-            <button class="btn-primary" style="padding:8px 18px; font-size:13px; font-weight:700;" onclick="submitReviewItem(${order.id}, ${item.id}, ${item.book_id})">🚀 Gửi Đánh Giá Ngay</button>
+            <button class="btn-primary" style="padding:8px 18px; font-size:13px; font-weight:700;" onclick="${existingReview ? `updateReviewItem(${order.id}, ${existingReview.id}, ${item.id})` : `submitReviewItem(${order.id}, ${item.id}, ${item.book_id})`}">${existingReview ? '✏️ Cập nhật đánh giá' : '🚀 Gửi Đánh Giá Ngay'}</button>
           </div>
         </div>
       </div>
@@ -2101,6 +2136,10 @@ async function openOrderReviewModal(orderId) {
 
   try {
     const order = await apiCall(`/api/orders/${orderId}`);
+    const myReviews = await apiCall('/api/reviews/my');
+    const reviewsByItem = new Map((Array.isArray(myReviews) ? myReviews : [])
+      .filter(review => Number(review.order_id) === Number(order.id))
+      .map(review => [Number(review.order_item_id), review]));
     const formRoot = document.getElementById('review-form-root');
     if (!formRoot) return;
     formRoot.innerHTML = `
@@ -2113,7 +2152,8 @@ async function openOrderReviewModal(orderId) {
           <div data-review-item="${item.id}" data-selected-rating="5" style="padding:14px; border:1px solid #e2e8f0; border-radius:10px; background:#f8fafc; display:flex; gap:14px; align-items:flex-start;">
             <img src="${item.book_cover || 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?auto=format&fit=crop&q=80&w=80'}" style="width:60px; height:80px; object-fit:cover; border-radius:8px; box-shadow:0 1px 3px rgba(0,0,0,0.1);">
             <div style="flex:1; min-width:0;">
-              <div style="font-weight:700; font-size:15px; margin-bottom:8px; color:#1e293b;">${item.book_title}</div>
+              <div style="font-weight:700; font-size:15px; margin-bottom:4px; color:#1e293b;">${item.book_title}</div>
+              <div style="font-size:12px; color:#64748b; margin-bottom:8px;">Tác giả: ${item.author || 'Đang cập nhật'}</div>
               
               <div style="margin-bottom:10px;">
                 <label style="display:block; font-weight:600; font-size:13px; margin-bottom:4px; color:#475569;">Đánh giá của bạn:</label>
@@ -2134,7 +2174,9 @@ async function openOrderReviewModal(orderId) {
               <textarea rows="3" placeholder="Viết nhận xét của bạn về sản phẩm..." style="width:100%; resize:vertical; border:1px solid #cbd5e1; border-radius:8px; padding:10px 12px; font-size:13px; font-family:inherit;" data-review-content="${item.id}"></textarea>
               <input type="text" placeholder="URL ảnh minh họa (tuỳ chọn)" style="width:100%; margin-top:8px; border:1px solid #cbd5e1; border-radius:8px; padding:8px 10px; font-size:13px;" data-review-image="${item.id}">
               <div style="display:flex; justify-content:flex-end; margin-top:12px;">
-                <button class="btn-primary" style="padding:7px 16px; font-size:13px; font-weight:700;" onclick="submitReviewItem(${order.id}, ${item.id}, ${item.book_id})">🚀 Gửi Đánh Giá</button>
+                ${reviewsByItem.has(Number(item.id))
+                  ? `<button class="btn-secondary" style="padding:7px 14px; font-size:13px; font-weight:700;" onclick="openEditOrderReview(${order.id}, ${item.id})">✏️ Đã đánh giá · Sửa</button>`
+                  : `<button class="btn-primary" style="padding:7px 16px; font-size:13px; font-weight:700;" onclick="submitReviewItem(${order.id}, ${item.id}, ${item.book_id})">🚀 Gửi Đánh Giá</button>`}
               </div>
             </div>
           </div>
@@ -2144,6 +2186,24 @@ async function openOrderReviewModal(orderId) {
     document.getElementById('review-modal').classList.add('open');
   } catch (error) {
     showToast(error.message || 'Không thể mở form đánh giá.', 'error');
+  }
+}
+
+async function openEditOrderReview(orderId, orderItemId) {
+  try {
+    const [order, reviews] = await Promise.all([
+      apiCall(`/api/orders/${orderId}`),
+      apiCall('/api/reviews/my')
+    ]);
+    const item = order.items.find(orderItem => Number(orderItem.id) === Number(orderItemId));
+    const review = (Array.isArray(reviews) ? reviews : []).find(itemReview => Number(itemReview.order_item_id) === Number(orderItemId));
+    if (!item || !review) {
+      showToast('Không tìm thấy đánh giá cần chỉnh sửa.', 'error');
+      return;
+    }
+    openSingleBookReviewModal(order, item, review);
+  } catch (error) {
+    showToast(error.message || 'Không thể mở đánh giá.', 'error');
   }
 }
 
@@ -2177,6 +2237,7 @@ async function submitReviewItem(orderId, orderItemId, productId) {
     if (document.getElementById('my-orders-modal')?.classList.contains('open')) {
       await openMyOrdersModal();
     }
+    await openOrderDetailModal(orderId);
     if (state.currentUser && state.currentPortal !== 'SELLER') {
       const book = state.books.find(item => item.id === Number(productId));
       if (book) await loadBookReviews(book.id);
@@ -2184,6 +2245,25 @@ async function submitReviewItem(orderId, orderItemId, productId) {
   } catch (error) {
     // keep the modal open so user can retry on validation errors
   }
+}
+
+async function updateReviewItem(orderId, reviewId, orderItemId) {
+  const itemRoot = document.querySelector(`[data-review-item="${orderItemId}"]`);
+  const checked = itemRoot?.querySelector(`input[name="rating-${orderItemId}"]:checked`);
+  const content = itemRoot?.querySelector(`[data-review-content="${orderItemId}"]`)?.value.trim();
+  if (!itemRoot || !content) {
+    showToast('Vui lòng nhập nhận xét cho sản phẩm.', 'warning');
+    return;
+  }
+  try {
+    await apiCall(`/api/reviews/${reviewId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ rating: Number(checked?.value || 5), content })
+    });
+    showToast('Đánh giá đã được cập nhật.', 'success');
+    closeModal('review-modal');
+    await openOrderDetailModal(orderId);
+  } catch (error) {}
 }
 
 async function openReturnRequestModal(orderId) {
@@ -4905,9 +4985,15 @@ async function renderBookstoresPage(root) {
 
 async function renderAccountPage(root, path) {
   if (path === '/account/orders' || path === '/account/history') {
-    const orders = await apiCall('/api/orders/my-orders');
-    const cards = orders.length ? orders.map(order => `<article class="account-order-card"><div><span class="checkout-eyebrow">${escapeContentHtml(order.order_code)}</span><h2>${formatVND(order.total_amount)}</h2><p>${new Date(order.created_at).toLocaleDateString('vi-VN')} · ${escapeContentHtml(order.status)}</p></div><button class="btn-preview" onclick="openOrderTrackerModal(${order.id})">Xem chi tiết</button></article>`).join('') : '<div class="content-empty">Bạn chưa có đơn hàng nào.</div>';
-    root.innerHTML = contentPageFrame('TÀI KHOẢN · ĐƠN HÀNG', 'Lịch sử mua hàng', 'Theo dõi các đơn sách, trạng thái thanh toán và vận chuyển của bạn.', `<div class="account-order-list">${cards}</div>`);
+    try {
+      state.myOrders = await apiCall('/api/orders/my-orders');
+      state.orderHistoryTarget = 'account-orders-history';
+      state.orderStatusFilter = 'ALL';
+      root.innerHTML = contentPageFrame('TÀI KHOẢN · ĐƠN HÀNG', 'Lịch sử mua hàng', 'Theo dõi các đơn sách, trạng thái thanh toán và vận chuyển của bạn.', '<div id="account-orders-history" class="account-order-list"></div>');
+      renderMyOrdersList('account-orders-history');
+    } catch (error) {
+      root.innerHTML = contentPageFrame('TÀI KHOẢN · ĐƠN HÀNG', 'Lịch sử mua hàng', 'Không thể tải lịch sử mua hàng lúc này.', '<div class="content-empty">Vui lòng thử lại sau.</div>');
+    }
     return;
   }
   if (path === '/account/addresses') { await renderAccountAddresses(root); return; }
