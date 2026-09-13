@@ -2619,11 +2619,71 @@ async function submitWithdrawalRequest() {
 
 
 // =============================================================
+// LOCAL STORAGE PERSISTENCE SYNC (Dành cho môi trường Vercel Serverless)
+// =============================================================
+function getCustomBooksFromLocalStorage() {
+  try {
+    return JSON.parse(localStorage.getItem('bookhub_custom_books') || '[]');
+  } catch (e) {
+    return [];
+  }
+}
+
+function saveCustomBookToLocalStorage(book) {
+  try {
+    const list = getCustomBooksFromLocalStorage();
+    const existingIdx = list.findIndex(b => String(b.id) === String(book.id) || (b.title === book.title && b.seller_id === book.seller_id));
+    if (existingIdx >= 0) {
+      list[existingIdx] = { ...list[existingIdx], ...book };
+    } else {
+      list.unshift(book);
+    }
+    localStorage.setItem('bookhub_custom_books', JSON.stringify(list));
+  } catch (e) {}
+}
+
+function updateCustomBookStatusInLocalStorage(bookId, status, rejectionReason = '') {
+  try {
+    const list = getCustomBooksFromLocalStorage();
+    const item = list.find(b => String(b.id) === String(bookId));
+    if (item) {
+      item.status = status;
+      if (rejectionReason) item.rejection_reason = rejectionReason;
+      localStorage.setItem('bookhub_custom_books', JSON.stringify(list));
+    }
+  } catch (e) {}
+}
+
+// =============================================================
 // TAB 2: 📚 QUẢN LÝ SẢN PHẨM & KHO (PRODUCTS & INVENTORY)
 // =============================================================
 async function loadSellerBooks() {
   try {
-    const books = await apiCall('/api/seller/books');
+    let books = [];
+    try {
+      books = await apiCall('/api/seller/books');
+    } catch (err) {
+      books = [];
+    }
+
+    // Merge custom books từ LocalStorage để bảo toàn dữ liệu trên môi trường Serverless (Vercel)
+    const customBooks = getCustomBooksFromLocalStorage().filter(b => {
+      if (!state.currentUser) return true;
+      return String(b.seller_id) === String(state.currentUser.id) || b.seller_shop_name === state.currentUser.shop_name;
+    });
+
+    const apiBookIds = new Set(books.map(b => String(b.id)));
+    customBooks.forEach(cb => {
+      if (!apiBookIds.has(String(cb.id))) {
+        books.unshift(cb);
+      } else {
+        const apiBook = books.find(b => String(b.id) === String(cb.id));
+        if (apiBook && cb.status && cb.status !== apiBook.status) {
+          apiBook.status = cb.status;
+        }
+      }
+    });
+
     sellerState.books = books;
     sellerState.selectedBookIds.clear();
     updateSellerBulkBarUI();
@@ -3038,10 +3098,29 @@ async function submitNewBook() {
   };
 
   try {
-    await apiCall('/api/seller/books', {
+    const resBook = await apiCall('/api/seller/books', {
       method: 'POST',
       body: JSON.stringify(payload)
     });
+
+    const categoryObj = state.categories.find(c => c.id === category_id);
+    const bookToSave = (resBook && resBook.id) ? resBook : {
+      id: Date.now(),
+      seller_id: state.currentUser?.id || 1,
+      seller_shop_name: state.currentUser?.shop_name || state.currentUser?.full_name || 'NXB Kim Đồng',
+      category_id,
+      category_name: categoryObj ? categoryObj.name : 'Chưa phân loại',
+      title, author, translator, price, discount_price, stock,
+      isbn, publication_year, page_count, book_format, cover_type, language,
+      cover_image: cover_image || 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?auto=format&fit=crop&q=80&w=400',
+      description, sample_content, full_ebook_content,
+      status: 'PENDING',
+      is_visible: true,
+      is_out_of_stock: false,
+      created_at: new Date().toISOString()
+    };
+    saveCustomBookToLocalStorage(bookToSave);
+
     showToast(`Đã đăng tải thành công cuốn sách "${title}"!`, 'success');
     closeModal('add-book-modal');
     await loadSellerBooks();
@@ -4530,7 +4609,21 @@ async function rejectSellerByAdmin(sellerId) {
 
 async function loadPendingBooks() {
   try {
-    const books = await apiCall('/api/admin/books/pending');
+    let books = [];
+    try {
+      books = await apiCall('/api/admin/books/pending');
+    } catch (err) {
+      books = [];
+    }
+
+    // Merge custom pending books từ LocalStorage để bảo toàn dữ liệu trên Vercel Serverless
+    const customPending = getCustomBooksFromLocalStorage().filter(b => b.status === 'PENDING' || !b.status);
+    const apiBookIds = new Set(books.map(b => String(b.id)));
+    customPending.forEach(cb => {
+      if (!apiBookIds.has(String(cb.id))) {
+        books.unshift(cb);
+      }
+    });
 
     // Luôn cập nhật badge số lượng sách chờ duyệt
     const prodBadge = document.getElementById('admin-products-badge');
@@ -4552,7 +4645,7 @@ async function loadPendingBooks() {
           b.stock,
           '<span class="admin-status warning">Chờ duyệt</span>'
         ]})),
-        (id, record) => `<button class="admin-row-action" onclick="showAdminProduct('${id}')">Xem</button><button class="admin-row-action" onclick="confirmAdminAction('Duyệt sản phẩm?', () => runAdminAction(this, () => adminService().ProductService.approveProduct('${id}'), 'Đã duyệt sản phẩm.').then(() => { loadPendingBooks(); updateAdminSidebarBadges(); }))">Duyệt</button><button class="admin-row-action danger-text" onclick="promptAdminReason('Từ chối sản phẩm', reason => runAdminAction(this, () => adminService().ProductService.rejectProduct('${id}', reason), 'Đã từ chối sản phẩm.').then(() => { loadPendingBooks(); updateAdminSidebarBadges(); }))">Từ chối</button>`
+        (id, record) => `<button class="admin-row-action" onclick="showAdminProduct('${id}')">Xem</button><button class="admin-row-action" onclick="updateCustomBookStatusInLocalStorage('${id}', 'APPROVED'); confirmAdminAction('Duyệt sản phẩm?', () => runAdminAction(this, () => adminService().ProductService.approveProduct('${id}'), 'Đã duyệt sản phẩm.').then(() => { loadPendingBooks(); updateAdminSidebarBadges(); }))">Duyệt</button><button class="admin-row-action danger-text" onclick="promptAdminReason('Từ chối sản phẩm', reason => { updateCustomBookStatusInLocalStorage('${id}', 'REJECTED', reason); runAdminAction(this, () => adminService().ProductService.rejectProduct('${id}', reason), 'Đã từ chối sản phẩm.').then(() => { loadPendingBooks(); updateAdminSidebarBadges(); }); })">Từ chối</button>`
       );
     }
 
@@ -4600,11 +4693,15 @@ async function loadPendingBooks() {
 }
 
 async function approveBookByAdmin(bookId) {
+  updateCustomBookStatusInLocalStorage(bookId, 'APPROVED');
   confirmAdminAction('Duyệt sản phẩm?', () => runAdminAction(document.activeElement, () => adminService().ProductService.approveProduct(bookId), 'Đã duyệt sản phẩm.').then(() => { loadPendingBooks(); updateAdminSidebarBadges(); }));
 }
 
 async function rejectBookByAdmin(bookId) {
-  promptAdminReason('Từ chối sản phẩm', reason => runAdminAction(document.activeElement, () => adminService().ProductService.rejectProduct(bookId, reason), 'Đã từ chối sản phẩm.').then(() => { loadPendingBooks(); updateAdminSidebarBadges(); }));
+  promptAdminReason('Từ chối sản phẩm', reason => {
+    updateCustomBookStatusInLocalStorage(bookId, 'REJECTED', reason);
+    return runAdminAction(document.activeElement, () => adminService().ProductService.rejectProduct(bookId, reason), 'Đã từ chối sản phẩm.').then(() => { loadPendingBooks(); updateAdminSidebarBadges(); });
+  });
 }
 
 async function loadAllUsersAdmin() {
